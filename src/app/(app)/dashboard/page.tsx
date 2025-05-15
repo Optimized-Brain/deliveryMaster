@@ -21,8 +21,8 @@ export default function DashboardPage() {
     setIsLoading(true);
     try {
       const [ordersResponse, pendingOrdersResponse] = await Promise.all([
-        fetch('/api/orders'), // Fetches all orders for chart and some metrics
-        fetch('/api/orders?status=pending') // Fetches pending orders count
+        fetch('/api/orders'), 
+        fetch('/api/orders?status=pending') 
       ]);
 
       if (!ordersResponse.ok) {
@@ -38,7 +38,6 @@ export default function DashboardPage() {
       }
       const fetchedPendingOrders: Order[] = await pendingOrdersResponse.json();
 
-      // Calculate metrics
       const totalOrders = fetchedOrders.length;
       const pendingOrdersCount = fetchedPendingOrders.length;
 
@@ -55,8 +54,8 @@ export default function DashboardPage() {
         if (metric.id === 'metric-total-orders') return { ...metric, value: totalOrders };
         if (metric.id === 'metric-pending-orders') return { ...metric, value: pendingOrdersCount };
         if (metric.id === 'metric-delivered-orders') return { ...metric, value: deliveredLast30Days };
-        if (metric.id === 'metric-avg-order-value') return { ...metric, value: `$${avgOrderValue.toFixed(2)}` };
-        return { ...metric, value: "N/A" }; // For metrics not yet implemented dynamically
+        if (metric.id === 'metric-avg-order-value') return { ...metric, value: `₹${avgOrderValue.toFixed(2)}` }; // Changed to INR
+        return { ...metric, value: "N/A" }; 
       }));
 
     } catch (error) {
@@ -66,7 +65,6 @@ export default function DashboardPage() {
         description: (error as Error).message,
         variant: "destructive",
       });
-      // Set metrics to error state or keep previous
        setMetrics(DASHBOARD_METRICS_CONFIG.map(m => ({ ...m, value: "Error", change: "", changeType: "negative" })));
     } finally {
       setIsLoading(false);

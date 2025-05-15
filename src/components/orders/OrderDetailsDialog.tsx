@@ -31,9 +31,8 @@ export function OrderDetailsDialog({ order, isOpen, onOpenChange }: OrderDetails
     switch (status) {
       case 'pending': return 'secondary';
       case 'assigned': return 'default';
-      case 'picked': return 'outline'; // Changed from 'in-transit'
+      case 'picked': return 'outline';
       case 'delivered': return 'default';
-      // 'cancelled' case removed
       default: return 'secondary';
     }
   };
@@ -41,7 +40,7 @@ export function OrderDetailsDialog({ order, isOpen, onOpenChange }: OrderDetails
      switch (status) {
       case 'delivered': return 'bg-emerald-500 hover:bg-emerald-600 text-white';
       case 'assigned': return 'bg-blue-500 hover:bg-blue-600 text-white';
-      case 'picked': return 'bg-amber-500 hover:bg-amber-600 text-white'; // Changed from 'in-transit'
+      case 'picked': return 'bg-amber-500 hover:bg-amber-600 text-white';
       default: return '';
     }
   }
@@ -50,7 +49,7 @@ export function OrderDetailsDialog({ order, isOpen, onOpenChange }: OrderDetails
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Order Details: {order.id}</DialogTitle>
+          <DialogTitle>Order Details: {order.id.substring(0,8)}...</DialogTitle>
           <DialogDescription>
             Comprehensive details for the selected order.
           </DialogDescription>
@@ -76,7 +75,7 @@ export function OrderDetailsDialog({ order, isOpen, onOpenChange }: OrderDetails
           </div>
           <div className="grid grid-cols-[150px_1fr] items-center gap-2">
             <span className="font-semibold text-muted-foreground">Order Value:</span>
-            <span>${order.orderValue.toFixed(2)}</span>
+            <span>₹{order.orderValue.toFixed(2)}</span>
           </div>
            <div className="grid grid-cols-[150px_1fr] items-center gap-2">
             <span className="font-semibold text-muted-foreground">Status:</span>
@@ -90,7 +89,7 @@ export function OrderDetailsDialog({ order, isOpen, onOpenChange }: OrderDetails
           {order.assignedPartnerId && (
             <div className="grid grid-cols-[150px_1fr] items-center gap-2">
               <span className="font-semibold text-muted-foreground">Assigned Partner:</span>
-              <span>{order.assignedPartnerId}</span>
+              <span>{order.assignedPartnerId.substring(0,8)}...</span>
             </div>
           )}
           <div className="grid grid-cols-[150px_1fr] items-center gap-2">

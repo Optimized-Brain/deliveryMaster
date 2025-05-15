@@ -20,7 +20,7 @@ const phoneRegex = new RegExp(
 
 const orderCreationSchema = z.object({
   customerName: z.string().min(2, "Customer name must be at least 2 characters"),
-  customerPhone: z.string().regex(phoneRegex, 'Invalid phone number').optional().or(z.literal('')),
+  customerPhone: z.string().regex(phoneRegex, 'Invalid phone number, e.g. +91 XXXXX XXXXX').optional().or(z.literal('')),
   itemName: z.string().min(1, "Item name is required"),
   itemQuantity: z.coerce.number().int().min(1, "Quantity must be at least 1"),
   area: z.string().min(1, "Area is required"),
@@ -100,7 +100,7 @@ export function OrderCreationForm({ onOrderCreated }: OrderCreationFormProps) {
             <FormItem>
               <FormLabel>Customer Name</FormLabel>
               <FormControl>
-                <Input placeholder="e.g., Jane Doe" {...field} />
+                <Input placeholder="e.g., Priya Sharma" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -113,7 +113,7 @@ export function OrderCreationForm({ onOrderCreated }: OrderCreationFormProps) {
             <FormItem>
               <FormLabel>Customer Phone (Optional)</FormLabel>
               <FormControl>
-                <Input type="tel" placeholder="e.g., (555) 123-4567" {...field} />
+                <Input type="tel" placeholder="e.g., +91 98765 43210" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -127,7 +127,7 @@ export function OrderCreationForm({ onOrderCreated }: OrderCreationFormProps) {
               <FormItem>
                 <FormLabel>Item Name</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g., Pizza" {...field} />
+                  <Input placeholder="e.g., Paneer Tikka" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -178,7 +178,7 @@ export function OrderCreationForm({ onOrderCreated }: OrderCreationFormProps) {
             <FormItem>
               <FormLabel>Delivery Address</FormLabel>
               <FormControl>
-                <Textarea placeholder="e.g., 123 Main St, Anytown, USA" {...field} />
+                <Textarea placeholder="e.g., 123, 5th Cross, Koramangala, Bangalore" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -189,9 +189,9 @@ export function OrderCreationForm({ onOrderCreated }: OrderCreationFormProps) {
           name="orderValue"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Order Value ($)</FormLabel>
+              <FormLabel>Order Value (₹)</FormLabel>
               <FormControl>
-                <Input type="number" step="0.01" placeholder="e.g., 25.99" {...field} />
+                <Input type="number" step="0.01" placeholder="e.g., 750.00" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

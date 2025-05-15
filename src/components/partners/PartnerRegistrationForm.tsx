@@ -19,7 +19,7 @@ const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/; // HH:MM format
 const partnerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
-  phone: z.string().min(10, "Phone number must be at least 10 digits"),
+  phone: z.string().min(10, "Phone number must be at least 10 digits (e.g., +91 XXXXX XXXXX)"),
   status: z.enum(PARTNER_STATUSES as [PartnerStatus, ...PartnerStatus[]]),
   assignedAreas: z.string().min(1, "At least one area is required (comma-separated)"),
   shiftStart: z.string().regex(timeRegex, "Invalid start time format (HH:MM)"),
@@ -77,7 +77,7 @@ export function PartnerRegistrationForm({ partnerToEdit, onPartnerRegistered, on
         rating: partnerToEdit.rating,
       });
     } else {
-      form.reset({ // Reset to default values for registration mode
+      form.reset({ 
         name: "",
         email: "",
         phone: "",
@@ -113,7 +113,7 @@ export function PartnerRegistrationForm({ partnerToEdit, onPartnerRegistered, on
         description: `${result.partner.name} has been successfully ${isEditMode ? 'updated' : 'registered'}.`,
         variant: "default",
       });
-      form.reset(); // Reset form after successful submission
+      form.reset(); 
       if (isEditMode) {
         onPartnerUpdated?.();
       } else {
@@ -147,7 +147,7 @@ export function PartnerRegistrationForm({ partnerToEdit, onPartnerRegistered, on
                 <FormItem>
                   <FormLabel>Full Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., John Doe" {...field} />
+                    <Input placeholder="e.g., Rajesh Kumar" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -161,7 +161,7 @@ export function PartnerRegistrationForm({ partnerToEdit, onPartnerRegistered, on
                   <FormItem>
                     <FormLabel>Email Address</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="e.g., john.doe@example.com" {...field} />
+                      <Input type="email" placeholder="e.g., rajesh.kumar@example.com" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -174,7 +174,7 @@ export function PartnerRegistrationForm({ partnerToEdit, onPartnerRegistered, on
                   <FormItem>
                     <FormLabel>Phone Number</FormLabel>
                     <FormControl>
-                      <Input type="tel" placeholder="e.g., (555) 123-4567" {...field} />
+                      <Input type="tel" placeholder="e.g., +91 98765 43210" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -212,7 +212,7 @@ export function PartnerRegistrationForm({ partnerToEdit, onPartnerRegistered, on
                 <FormItem>
                   <FormLabel>Assigned Areas (comma-separated)</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Downtown, North End" {...field} />
+                    <Input placeholder="e.g., Koramangala, Indiranagar" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

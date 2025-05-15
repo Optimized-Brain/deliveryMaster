@@ -17,7 +17,7 @@ interface OrderTableProps {
   onAssignOrder?: (orderId: string) => void;
   onMarkAsPickedUp?: (orderId: string) => void;
   onMarkAsDelivered?: (orderId: string) => void;
-  onReportIssue?: (orderId: string) => void; // New prop
+  onReportIssue?: (orderId: string) => void; 
 }
 
 type SortKey = keyof Order | '';
@@ -28,7 +28,7 @@ export function OrderTable({
   onAssignOrder,
   onMarkAsPickedUp,
   onMarkAsDelivered,
-  onReportIssue // New prop
+  onReportIssue 
 }: OrderTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('creationDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -117,7 +117,7 @@ export function OrderTable({
         <TableBody>
           {sortedOrders.map((order) => (
             <TableRow key={order.id}>
-              <TableCell className="font-medium truncate max-w-[100px]">{order.id}</TableCell>
+              <TableCell className="font-medium truncate max-w-[100px]">{order.id.substring(0,8)}...</TableCell>
               <TableCell>{order.customerName}</TableCell>
               <TableCell>{order.area}</TableCell>
               <TableCell>
@@ -125,7 +125,7 @@ export function OrderTable({
                   {order.status}
                 </Badge>
               </TableCell>
-              <TableCell className="text-right">${order.orderValue.toFixed(2)}</TableCell>
+              <TableCell className="text-right">₹{order.orderValue.toFixed(2)}</TableCell>
               <TableCell className="text-right" suppressHydrationWarning>
                 {order.creationDate ? format(new Date(order.creationDate), "PPp") : ''}
               </TableCell>
