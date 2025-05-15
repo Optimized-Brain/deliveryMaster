@@ -138,7 +138,8 @@ export default function OrdersPage() {
   };
 
   const handleMarkAsPickedUp = (orderId: string) => {
-    updateOrderStatus(orderId, 'in-transit', `Order ${orderId} marked as picked up (in-transit).`);
+    // Changed status to 'picked'
+    updateOrderStatus(orderId, 'picked', `Order ${orderId} marked as picked up.`);
   };
 
   const handleMarkAsDelivered = (orderId: string) => {

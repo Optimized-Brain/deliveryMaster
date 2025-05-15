@@ -31,9 +31,9 @@ export function OrderDetailsDialog({ order, isOpen, onOpenChange }: OrderDetails
     switch (status) {
       case 'pending': return 'secondary';
       case 'assigned': return 'default';
-      case 'in-transit': return 'outline';
+      case 'picked': return 'outline'; // Changed from 'in-transit'
       case 'delivered': return 'default';
-      case 'cancelled': return 'destructive';
+      // 'cancelled' case removed
       default: return 'secondary';
     }
   };
@@ -41,7 +41,7 @@ export function OrderDetailsDialog({ order, isOpen, onOpenChange }: OrderDetails
      switch (status) {
       case 'delivered': return 'bg-emerald-500 hover:bg-emerald-600 text-white';
       case 'assigned': return 'bg-blue-500 hover:bg-blue-600 text-white';
-      case 'in-transit': return 'bg-amber-500 hover:bg-amber-600 text-white';
+      case 'picked': return 'bg-amber-500 hover:bg-amber-600 text-white'; // Changed from 'in-transit'
       default: return '';
     }
   }

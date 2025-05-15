@@ -19,7 +19,7 @@ const DUMMY_PARTNER_UUID_1 = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
 const DUMMY_PARTNER_UUID_2 = "a1b2c3d4-e5f6-7890-1234-567890abcdef";
 const DUMMY_PARTNER_UUID_3 = "b2c3d4e5-f6a7-8901-2345-67890abcdef0";
 
-// SAMPLE_ORDERS - Updated with diverse statuses for demo and UUIDs
+// SAMPLE_ORDERS - Updated to match new OrderStatus constraints ('picked', no 'cancelled')
 export const SAMPLE_ORDERS: Order[] = [
   {
     id: '1d9c7c31-176a-4a40-9e0e-77a17dfc4b8f',
@@ -94,7 +94,7 @@ export const SAMPLE_ORDERS: Order[] = [
     customerName: 'Grace Wilson',
     customerPhone: '555-0107',
     items: [{ name: 'Tacos (3)', quantity: 2 }, { name: 'Guacamole', quantity: 1 }],
-    status: 'in-transit',
+    status: 'picked', // Changed from 'in-transit'
     assignedPartnerId: DUMMY_PARTNER_UUID_1,
     area: 'Uptown',
     creationDate: "2024-05-12T12:30:00.000Z",
@@ -106,7 +106,7 @@ export const SAMPLE_ORDERS: Order[] = [
     customerName: 'Henry Moore',
     customerPhone: '555-0108',
     items: [{ name: 'Chicken Curry', quantity: 1 }, { name: 'Naan Bread', quantity: 2 }],
-    status: 'in-transit',
+    status: 'picked', // Changed from 'in-transit'
     assignedPartnerId: DUMMY_PARTNER_UUID_3,
     area: 'Midtown',
     creationDate: "2024-05-12T13:10:00.000Z",
@@ -130,7 +130,7 @@ export const SAMPLE_ORDERS: Order[] = [
     customerName: 'Jack Anderson',
     customerPhone: '555-0110',
     items: [{ name: 'Vegetable Stir-fry', quantity: 1 }, { name: 'Iced Tea', quantity: 1 }],
-    status: 'cancelled',
+    status: 'pending', // Changed from 'cancelled' to 'pending' as 'cancelled' is not allowed
     area: 'North End',
     creationDate: "2024-05-11T20:00:00.000Z",
     deliveryAddress: '707 Willow Way, North End, XY 12354',
@@ -174,4 +174,5 @@ export const DASHBOARD_METRICS: Metric[] = [
 
 export const AVAILABLE_AREAS: string[] = ['Downtown', 'North End', 'Westside', 'Eastside', 'Suburbia', 'Financial District', 'Uptown', 'Midtown'];
 export const PARTNER_STATUSES: PartnerStatus[] = ['active', 'inactive', 'on-break'];
-export const ORDER_STATUSES: OrderStatus[] = ['pending', 'assigned', 'in-transit', 'delivered', 'cancelled'];
+// Updated ORDER_STATUSES to match database constraint
+export const ORDER_STATUSES: OrderStatus[] = ['pending', 'assigned', 'picked', 'delivered'];

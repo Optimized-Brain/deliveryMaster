@@ -18,13 +18,13 @@ export async function PUT(request: Request, context: { params: Params }) {
 
     console.log(`PUT /api/orders/${id}/status: Received status: '${status}', assignedPartnerId: '${assignedPartnerId}'`);
 
-
     if (!status) {
       console.warn(`PUT /api/orders/${id}/status: Status is required in request body.`);
       return NextResponse.json({ message: 'Status is required' }, { status: 400 });
     }
 
-    const validStatuses: OrderStatus[] = ['pending', 'assigned', 'in-transit', 'delivered', 'cancelled'];
+    // Updated validStatuses to match database constraint
+    const validStatuses: OrderStatus[] = ['pending', 'assigned', 'picked', 'delivered'];
     if (!validStatuses.includes(status as OrderStatus)) {
         console.warn(`PUT /api/orders/${id}/status: Invalid status provided: ${status}. Valid statuses are: ${validStatuses.join(', ')}`);
         return NextResponse.json({ message: `Invalid status: ${status}. Valid statuses are: ${validStatuses.join(', ')}` }, { status: 400 });
@@ -33,7 +33,7 @@ export async function PUT(request: Request, context: { params: Params }) {
     const updateData: { status: OrderStatus; assigned_to?: string | null } = { status: status as OrderStatus };
     if (assignedPartnerId) {
       updateData.assigned_to = assignedPartnerId;
-    } else if (status === 'pending' || status === 'cancelled') {
+    } else if (status === 'pending') { // 'cancelled' removed from this condition
       updateData.assigned_to = null;
     }
 
@@ -47,7 +47,7 @@ export async function PUT(request: Request, context: { params: Params }) {
 
     if (error) {
       console.error(`PUT /api/orders/${id}/status: Error updating order in Supabase:`, error);
-      if (error.code === 'PGRST116') {
+      if (error.code === 'PGRST116') { // "Resource not found"
         return NextResponse.json({ message: `Order with ID ${id} not found.` }, { status: 404 });
       }
       // For other Supabase errors, provide a more specific message
