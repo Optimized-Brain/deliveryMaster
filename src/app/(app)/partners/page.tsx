@@ -24,22 +24,25 @@ export default function PartnersPage() {
       if (!response.ok) {
         let errorDetails = `Failed to fetch partners (status: ${response.status})`;
         try {
-          const errorData = await response.json();
-          if (errorData.error) { // Prioritize Supabase specific error
-            errorDetails = `Failed to fetch partners: ${errorData.error}`;
-          } else if (errorData.message) {
-            errorDetails = errorData.message;
+          const errorText = await response.text();
+          if (errorText.toLowerCase().includes("<!doctype html>")) {
+             errorDetails = `Failed to fetch partners. Server returned an HTML error page (status: ${response.status}). Check server logs.`;
+          } else {
+            const errorData = JSON.parse(errorText);
+            if (errorData.error) {
+              errorDetails = `Failed to fetch partners: ${errorData.error}`;
+            } else if (errorData.message) {
+              errorDetails = errorData.message;
+            }
           }
         } catch (parseError) {
           errorDetails = `Failed to fetch partners (status: ${response.status} ${response.statusText}). Could not parse error response.`;
-          console.error("Failed to parse error response from API:", parseError);
         }
         throw new Error(errorDetails);
       }
       const data: Partner[] = await response.json();
       setPartners(data);
     } catch (error) {
-      console.error("Error fetching partners client-side:", error);
       toast({ 
         title: "Error Loading Partners", 
         description: (error as Error).message, 
@@ -76,16 +79,13 @@ export default function PartnersPage() {
       try {
         const response = await fetch(`/api/partners/${partnerId}`, { method: 'DELETE' });
         if (!response.ok) {
-          const errorData = await response.json();
-          // Prioritize errorData.error (Supabase-specific detail) then errorData.message (API level message)
-          const detailedMessage = errorData.error || errorData.message || `Failed to delete partner ${partnerToDelete.name} (status: ${response.status} ${response.statusText})`;
+          const errorData = await response.json().catch(() => ({ message: `Failed to delete partner ${partnerToDelete.name} (status: ${response.status} ${response.statusText}). Could not parse error response.` }));
+          const detailedMessage = errorData.error || errorData.message || `Failed to delete partner ${partnerToDelete.name}`;
           throw new Error(detailedMessage);
         }
-        // On successful deletion, update the local state
         setPartners(prevPartners => prevPartners.filter(p => p.id !== partnerId));
         toast({ title: "Partner Deleted", description: `Partner ${partnerToDelete.name} has been successfully deleted.`, variant: "default" });
       } catch (error) {
-        console.error("Error deleting partner:", error);
         toast({ title: "Deletion Failed", description: (error as Error).message, variant: "destructive" });
       }
     }
@@ -160,3 +160,5 @@ export default function PartnersPage() {
     </div>
   );
 }
+
+    

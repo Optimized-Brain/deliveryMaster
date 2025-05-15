@@ -45,7 +45,6 @@ function AssignedOrdersPopoverContent({ partnerId, partnerName }: AssignedOrders
             const errorData = JSON.parse(errorText);
             message = errorData.message || errorData.error || message;
         } catch (e) {
-            // If parsing fails, use the raw text or a generic message if text is HTML
             if (errorText.toLowerCase().includes("<!doctype html>")) {
                 message = `Failed to fetch orders for ${partnerName}. Server returned an HTML error. Check server logs.`;
             } else {
@@ -55,11 +54,9 @@ function AssignedOrdersPopoverContent({ partnerId, partnerName }: AssignedOrders
         throw new Error(message);
       }
       const data: Order[] = await response.json();
-      // Filter for active assignments ('assigned' or 'picked')
       const activeAssignments = data.filter(order => order.status === 'assigned' || order.status === 'picked');
       setOrders(activeAssignments);
     } catch (e) {
-      console.error(`Error fetching orders for partner ${partnerName} (ID: ${partnerId}):`, e);
       const errorMessage = (e as Error).message;
       setError(errorMessage);
       toast({
@@ -73,10 +70,8 @@ function AssignedOrdersPopoverContent({ partnerId, partnerName }: AssignedOrders
   }, [partnerId, partnerName, toast]);
 
   useEffect(() => {
-    // This effect runs when the popover content is mounted / partnerId changes.
-    // Popover content is typically mounted when it's opened.
     fetchAssignedOrders();
-  }, [fetchAssignedOrders]); // fetchAssignedOrders is memoized and changes if partnerId/Name changes
+  }, [fetchAssignedOrders]);
 
   if (isLoading) {
     return (
@@ -283,12 +278,16 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => onEditPartner?.(partner.id)}>
-                          <Edit2 className="mr-2 h-4 w-4" /> Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onDeletePartner?.(partner.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
-                        </DropdownMenuItem>
+                        {onEditPartner && (
+                          <DropdownMenuItem onClick={() => onEditPartner(partner.id)}>
+                            <Edit2 className="mr-2 h-4 w-4" /> Edit
+                          </DropdownMenuItem>
+                        )}
+                        {onDeletePartner && (
+                          <DropdownMenuItem onClick={() => onDeletePartner(partner.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -301,3 +300,5 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
     </div>
   );
 }
+
+    
