@@ -4,12 +4,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { OrderFilters } from "@/components/orders/OrderFilters";
 import { OrderTable } from "@/components/orders/OrderTable";
-import { OrderCreationForm } from "@/components/orders/OrderCreationForm"; // Import new form
+import { OrderCreationForm } from "@/components/orders/OrderCreationForm";
+import { OrderDetailsDialog } from "@/components/orders/OrderDetailsDialog"; // Import new dialog
 import type { Order, OrderStatus } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from 'next/navigation';
 import { Loader2, PlusCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button'; // Import Button
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -17,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"; // Import Dialog components
+} from "@/components/ui/dialog";
 
 export default function OrdersPage() {
   const { toast } = useToast();
@@ -26,6 +27,8 @@ export default function OrdersPage() {
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateOrderDialogOpen, setIsCreateOrderDialogOpen] = useState(false);
+  const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<Order | null>(null);
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
 
   const fetchOrders = useCallback(async () => {
     setIsLoading(true);
@@ -39,11 +42,10 @@ export default function OrdersPage() {
           if (errorText.startsWith("<!DOCTYPE html>")) {
             errorMessage = `Failed to fetch orders. Server returned an HTML error page (status: ${response.status}). Check server logs.`;
           } else {
-             const errorData = JSON.parse(errorText); // Attempt to parse as JSON
+             const errorData = JSON.parse(errorText);
              errorMessage = errorData.error || errorData.message || errorMessage;
           }
         } catch (jsonParseError) {
-          // Failed to parse, means server likely sent HTML or non-JSON
           console.error("Failed to parse JSON error response from fetching orders. Server might have sent HTML.", jsonParseError);
           errorMessage = `Failed to fetch orders. Server returned a non-JSON response (status: ${response.status}). Check server logs for the underlying error (e.g., environment variables).`;
         }
@@ -94,8 +96,13 @@ export default function OrdersPage() {
   }
 
   const handleViewOrder = (orderId: string) => {
-    toast({ title: "View Order", description: `Viewing details for order ${orderId}` });
-    // Future: router.push(`/orders/${orderId}`);
+    const orderToShow = allOrders.find(order => order.id === orderId);
+    if (orderToShow) {
+      setSelectedOrderForDetails(orderToShow);
+      setIsDetailsDialogOpen(true);
+    } else {
+      toast({ title: "Error", description: "Could not find order details.", variant: "destructive" });
+    }
   };
 
   const handleAssignOrder = (orderId: string) => {
@@ -103,9 +110,41 @@ export default function OrdersPage() {
   };
 
   const handleOrderCreated = () => {
-    fetchOrders(); // Refresh the list
-    setIsCreateOrderDialogOpen(false); // Close the dialog
+    fetchOrders(); 
+    setIsCreateOrderDialogOpen(false); 
   };
+
+  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus, successMessage: string) => {
+    try {
+      const response = await fetch(`/api/orders/${orderId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Failed to update order status to ${newStatus}`);
+      }
+      toast({ title: "Order Updated", description: successMessage });
+      fetchOrders(); // Refresh orders list
+    } catch (error) {
+      toast({
+        title: "Update Failed",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleMarkAsPickedUp = (orderId: string) => {
+    updateOrderStatus(orderId, 'in-transit', `Order ${orderId} marked as picked up (in-transit).`);
+  };
+
+  const handleMarkAsDelivered = (orderId: string) => {
+    updateOrderStatus(orderId, 'delivered', `Order ${orderId} marked as delivered.`);
+  };
+
 
   return (
     <div className="space-y-6">
@@ -140,9 +179,16 @@ export default function OrdersPage() {
         <OrderTable 
           orders={filteredOrders} 
           onViewOrder={handleViewOrder} 
-          onAssignOrder={handleAssignOrder} 
+          onAssignOrder={handleAssignOrder}
+          onMarkAsPickedUp={handleMarkAsPickedUp}
+          onMarkAsDelivered={handleMarkAsDelivered}
         />
       )}
+      <OrderDetailsDialog 
+        order={selectedOrderForDetails}
+        isOpen={isDetailsDialogOpen}
+        onOpenChange={setIsDetailsDialogOpen}
+      />
     </div>
   );
 }

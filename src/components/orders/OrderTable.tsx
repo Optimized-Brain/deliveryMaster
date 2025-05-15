@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -5,8 +6,8 @@ import type { Order, OrderStatus } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ArrowUpDown, MoreHorizontal, Eye } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { ArrowUpDown, MoreHorizontal, Eye, Truck, CheckCircle2 } from "lucide-react";
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -14,11 +15,19 @@ interface OrderTableProps {
   orders: Order[];
   onViewOrder?: (orderId: string) => void;
   onAssignOrder?: (orderId: string) => void;
+  onMarkAsPickedUp?: (orderId: string) => void;
+  onMarkAsDelivered?: (orderId: string) => void;
 }
 
 type SortKey = keyof Order | '';
 
-export function OrderTable({ orders, onViewOrder, onAssignOrder }: OrderTableProps) {
+export function OrderTable({ 
+  orders, 
+  onViewOrder, 
+  onAssignOrder,
+  onMarkAsPickedUp,
+  onMarkAsDelivered 
+}: OrderTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('creationDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
@@ -28,7 +37,6 @@ export function OrderTable({ orders, onViewOrder, onAssignOrder }: OrderTablePro
       let valA = a[sortKey as keyof Order];
       let valB = b[sortKey as keyof Order];
 
-      // Handle specific types for sorting
       if (sortKey === 'creationDate') {
         valA = new Date(valA as string).getTime();
         valB = new Date(valB as string).getTime();
@@ -36,7 +44,6 @@ export function OrderTable({ orders, onViewOrder, onAssignOrder }: OrderTablePro
         valA = Number(valA);
         valB = Number(valB);
       }
-
 
       if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
       if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
@@ -58,7 +65,7 @@ export function OrderTable({ orders, onViewOrder, onAssignOrder }: OrderTablePro
       case 'pending': return 'secondary';
       case 'assigned': return 'default';
       case 'in-transit': return 'outline';
-      case 'delivered': return 'default'; // Should be a success variant, using primary for now
+      case 'delivered': return 'default'; 
       case 'cancelled': return 'destructive';
       default: return 'secondary';
     }
@@ -66,7 +73,9 @@ export function OrderTable({ orders, onViewOrder, onAssignOrder }: OrderTablePro
   
   const getStatusBadgeClass = (status: OrderStatus) => {
      switch (status) {
-      case 'delivered': return 'bg-emerald-500 hover:bg-emerald-600 text-white'; // Custom success color
+      case 'delivered': return 'bg-emerald-500 hover:bg-emerald-600 text-white';
+      case 'assigned': return 'bg-blue-500 hover:bg-blue-600 text-white';
+      case 'in-transit': return 'bg-amber-500 hover:bg-amber-600 text-white';
       default: return '';
     }
   }
@@ -107,7 +116,7 @@ export function OrderTable({ orders, onViewOrder, onAssignOrder }: OrderTablePro
         <TableBody>
           {sortedOrders.map((order) => (
             <TableRow key={order.id}>
-              <TableCell className="font-medium">{order.id}</TableCell>
+              <TableCell className="font-medium truncate max-w-[100px]">{order.id}</TableCell>
               <TableCell>{order.customerName}</TableCell>
               <TableCell>{order.area}</TableCell>
               <TableCell>
@@ -128,12 +137,25 @@ export function OrderTable({ orders, onViewOrder, onAssignOrder }: OrderTablePro
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => onViewOrder?.(order.id)}>
-                      <Eye className="mr-2 h-4 w-4" /> View Details
-                    </DropdownMenuItem>
+                    {onViewOrder && (
+                      <DropdownMenuItem onClick={() => onViewOrder(order.id)}>
+                        <Eye className="mr-2 h-4 w-4" /> View Details
+                      </DropdownMenuItem>
+                    )}
+                    {(order.status === 'pending' || order.status === 'assigned') && <DropdownMenuSeparator />}
                     {order.status === 'pending' && onAssignOrder && (
                       <DropdownMenuItem onClick={() => onAssignOrder(order.id)}>
                         Assign Partner
+                      </DropdownMenuItem>
+                    )}
+                    {order.status === 'assigned' && onMarkAsPickedUp && (
+                      <DropdownMenuItem onClick={() => onMarkAsPickedUp(order.id)}>
+                        <Truck className="mr-2 h-4 w-4" /> Mark as Picked Up
+                      </DropdownMenuItem>
+                    )}
+                    {order.status === 'in-transit' && onMarkAsDelivered && (
+                       <DropdownMenuItem onClick={() => onMarkAsDelivered(order.id)}>
+                        <CheckCircle2 className="mr-2 h-4 w-4" /> Mark as Delivered
                       </DropdownMenuItem>
                     )}
                   </DropdownMenuContent>

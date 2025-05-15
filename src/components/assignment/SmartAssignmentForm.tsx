@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel as RHFormLabel, FormMessage } from "@/components/ui/form"; // Renamed FormLabel to avoid conflict
 import { Label } from "@/components/ui/label"; // Standard Label
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Wand2, Send, CheckCircle } from "lucide-react";
+import { Loader2, Wand2, CheckCircle } from "lucide-react"; // Removed Send icon
 import { useToast } from '@/hooks/use-toast';
 import { assignOrder, type AssignOrderInput, type AssignOrderOutput } from "@/ai/flows/smart-order-assignment";
 import { AssignmentResultCard } from './AssignmentResultCard';
@@ -86,7 +86,7 @@ export function SmartAssignmentForm() {
            if (errorText.startsWith("<!DOCTYPE html>")) {
             errorDetails = `Failed to fetch available partners. Server returned an HTML error page (status: ${partnersResponse.status}). Check server logs for the underlying error (e.g., environment variables).`;
           } else {
-            const errorData = JSON.parse(errorText); // Attempt to parse as JSON
+            const errorData = JSON.parse(errorText); 
             errorDetails = errorData.message || errorData.error || errorDetails;
           }
         } catch (parseError) {
@@ -104,6 +104,18 @@ export function SmartAssignmentForm() {
         if (selectedOrder) {
           form.setValue('orderId', queryOrderId);
           form.setValue('orderLocation', selectedOrder.area);
+        } else {
+            // If queryOrderId is present but not in pending orders, clear the form fields
+            // or inform the user the order is not assignable.
+            form.resetField('orderId');
+            form.resetField('orderLocation');
+            if (queryOrderId) { // Only toast if there was an attempt to pre-select
+                toast({
+                    title: "Order Not Assignable",
+                    description: `Order ${queryOrderId} is not pending or not found. Please select another.`,
+                    variant: "default" 
+                });
+            }
         }
       }
 
@@ -130,7 +142,7 @@ export function SmartAssignmentForm() {
 
     const selectedOrder = pendingOrders.find(o => o.id === data.orderId); 
     if (!selectedOrder) {
-        toast({ title: "Error", description: "Selected order not found.", variant: "destructive"});
+        toast({ title: "Error", description: "Selected order not found in pending orders list.", variant: "destructive"});
         setIsFetchingSuggestion(false);
         return;
     }
@@ -202,7 +214,7 @@ export function SmartAssignmentForm() {
             if (errorData && errorData.message) { 
                 errorDetails = errorData.message;
             } else {
-                 const errorText = await updateResponse.text(); // Fallback to text if JSON parse fails or no message
+                 const errorText = await updateResponse.text(); 
                  console.error("Raw error text from PUT /api/orders/[id]/status:", errorText);
                  errorDetails = `Failed to update order status (API status: ${updateResponse.status}). ${errorText.substring(0,100)}`;
             }
@@ -219,12 +231,13 @@ export function SmartAssignmentForm() {
         variant: "default"
       });
       
-      fetchData(); 
+      // Reset form and state for next assignment
+      form.reset({ orderId: "", orderLocation: "" });
       setAiSuggestion(null); 
       setSelectedPartnerForAssignment(''); 
-      form.resetField('orderId'); 
-      form.resetField('orderLocation');
-      // router.push('/orders'); // Optionally navigate away
+      fetchData(); // Refresh pending orders and available partners
+      // Optionally, navigate away or show a success message encouraging next action
+      // router.push('/orders'); // Example navigation
 
     } catch (error) {
       console.error("Order assignment confirmation failed:", error);
@@ -269,6 +282,8 @@ export function SmartAssignmentForm() {
                         const currentSelectedOrder = pendingOrders.find(o => o.id === value);
                         if (currentSelectedOrder) {
                           form.setValue("orderLocation", currentSelectedOrder.area); 
+                        } else {
+                           form.setValue("orderLocation", ""); // Clear location if order not found/cleared
                         }
                         setAiSuggestion(null); 
                         setSelectedPartnerForAssignment('');
@@ -285,7 +300,7 @@ export function SmartAssignmentForm() {
                         {pendingOrders.length > 0 ? (
                           pendingOrders.map(order => (
                             <SelectItem key={order.id} value={order.id}>
-                              {order.id} ({order.customerName} - {order.area})
+                              {order.id.substring(0,8)}... ({order.customerName} - {order.area})
                             </SelectItem>
                           ))
                         ) : (
@@ -345,21 +360,20 @@ export function SmartAssignmentForm() {
               <CardDescription>Confirm the AI's suggestion or choose a different partner.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <FormItem> {/* FormItem can stay for styling/layout */}
-                <Label htmlFor="partner-select">Assign to Partner</Label> {/* Changed FormLabel to Label */}
+              <FormItem> 
+                <Label htmlFor="partner-select">Assign to Partner</Label>
                 <Select
                   value={selectedPartnerForAssignment}
                   onValueChange={setSelectedPartnerForAssignment}
                   disabled={isConfirmingAssignment || availablePartners.length === 0}
                 >
-                  {/* Removed FormControl wrapper */}
                   <SelectTrigger id="partner-select">
                     <SelectValue placeholder="Select a partner" />
                   </SelectTrigger>
                   <SelectContent>
                     {availablePartners.map(partner => (
                       <SelectItem key={partner.id} value={partner.id}>
-                        {partner.name} (ID: {partner.id}) - Load: {partner.currentLoad}
+                        {partner.name} (ID: {partner.id.substring(0,8)}...) - Load: {partner.currentLoad}
                       </SelectItem>
                     ))}
                   </SelectContent>
