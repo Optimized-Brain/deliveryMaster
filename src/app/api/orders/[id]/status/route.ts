@@ -21,7 +21,7 @@ export async function PUT(request: Request, context: { params: Params }) {
       return NextResponse.json({ message: 'Status is required' }, { status: 400 });
     }
     
-    const validStatuses: OrderStatus[] = ['pending', 'assigned', 'in-transit', 'delivered', 'cancelled'];
+    const validStatuses: OrderStatus[] = ['pending', 'assigned', 'in transit', 'delivered', 'cancelled']; // Changed 'in-transit'
     if (!validStatuses.includes(status)) {
         console.warn(`PUT /api/orders/${id}/status: Invalid status provided: ${status}.`);
         return NextResponse.json({ message: `Invalid status: ${status}` }, { status: 400 });

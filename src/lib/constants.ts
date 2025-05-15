@@ -94,7 +94,7 @@ export const SAMPLE_ORDERS: Order[] = [
     customerName: 'Grace Wilson',
     customerPhone: '555-0107',
     items: [{ name: 'Tacos (3)', quantity: 2 }, { name: 'Guacamole', quantity: 1 }],
-    status: 'in-transit' as OrderStatus,
+    status: 'in transit' as OrderStatus, // Changed 'in-transit'
     assignedPartnerId: DUMMY_PARTNER_UUID_1, 
     area: 'Uptown',
     creationDate: "2024-05-12T12:30:00.000Z",
@@ -106,7 +106,7 @@ export const SAMPLE_ORDERS: Order[] = [
     customerName: 'Henry Moore',
     customerPhone: '555-0108',
     items: [{ name: 'Chicken Curry', quantity: 1 }, { name: 'Naan Bread', quantity: 2 }],
-    status: 'in-transit' as OrderStatus,
+    status: 'in transit' as OrderStatus, // Changed 'in-transit'
     assignedPartnerId: DUMMY_PARTNER_UUID_3, 
     area: 'Midtown',
     creationDate: "2024-05-12T13:10:00.000Z",
@@ -159,7 +159,6 @@ export const DASHBOARD_METRICS: Metric[] = [
   {
     id: 'metric-orders',
     title: 'Pending Orders',
-    // This count is based on the updated SAMPLE_ORDERS above
     value: SAMPLE_ORDERS.filter(o => o.status === 'pending').length, 
     icon: ListOrdered,
     changeType: 'neutral',
@@ -167,7 +166,7 @@ export const DASHBOARD_METRICS: Metric[] = [
   {
     id: 'metric-areas',
     title: 'Top Performing Area',
-    value: 'N/A', // This would require more complex calculation from orders
+    value: 'N/A', 
     icon: MapPin,
     changeType: 'neutral',
   },
@@ -175,4 +174,4 @@ export const DASHBOARD_METRICS: Metric[] = [
 
 export const AVAILABLE_AREAS: string[] = ['Downtown', 'North End', 'Westside', 'Eastside', 'Suburbia', 'Financial District', 'Uptown', 'Midtown'];
 export const PARTNER_STATUSES: PartnerStatus[] = ['active', 'inactive', 'on-break'];
-export const ORDER_STATUSES: OrderStatus[] = ['pending', 'assigned', 'in-transit', 'delivered', 'cancelled'];
+export const ORDER_STATUSES: OrderStatus[] = ['pending', 'assigned', 'in transit', 'delivered', 'cancelled']; // Changed 'in-transit'

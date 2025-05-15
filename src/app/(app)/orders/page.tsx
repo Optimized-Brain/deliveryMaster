@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { OrderFilters } from "@/components/orders/OrderFilters";
 import { OrderTable } from "@/components/orders/OrderTable";
 import { OrderCreationForm } from "@/components/orders/OrderCreationForm";
-import { OrderDetailsDialog } from "@/components/orders/OrderDetailsDialog"; // Import new dialog
+import { OrderDetailsDialog } from "@/components/orders/OrderDetailsDialog"; 
 import type { Order, OrderStatus } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from 'next/navigation';
@@ -138,7 +138,7 @@ export default function OrdersPage() {
   };
 
   const handleMarkAsPickedUp = (orderId: string) => {
-    updateOrderStatus(orderId, 'in-transit', `Order ${orderId} marked as picked up (in-transit).`);
+    updateOrderStatus(orderId, 'in transit', `Order ${orderId} marked as picked up (in transit).`); // Changed 'in-transit'
   };
 
   const handleMarkAsDelivered = (orderId: string) => {

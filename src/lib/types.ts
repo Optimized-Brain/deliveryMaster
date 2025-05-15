@@ -24,7 +24,7 @@ export interface Partner {
   registrationDate: string; // ISO string (maps to created_at from Supabase)
 }
 
-export type OrderStatus = 'pending' | 'assigned' | 'in-transit' | 'delivered' | 'cancelled';
+export type OrderStatus = 'pending' | 'assigned' | 'in transit' | 'delivered' | 'cancelled'; // Changed 'in-transit'
 
 export interface Order {
   id: string;
