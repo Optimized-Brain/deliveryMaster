@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import type { Partner, PartnerStatus, Order } from "@/lib/types";
+import type { Partner, PartnerStatus, Order, OrderStatus } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { ArrowUpDown, MoreHorizontal, Edit2, Trash2, Phone, Mail, ListOrdered, Loader2, PackageCheck, PackageSearch } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, Edit2, Trash2, Phone, Mail, ListOrdered, Loader2, PackageCheck, PackageSearch, PackageX, Package } from "lucide-react";
 import { cn } from '@/lib/utils';
 import { PARTNER_STATUSES } from '@/lib/constants';
 import Link from 'next/link';
@@ -39,7 +39,7 @@ function AssignedOrdersPopoverContent({ partnerId, partnerName }: AssignedOrders
         let message = `Failed to fetch orders for partner ${partnerName} (status: ${response.status})`;
         try {
             const errorData = JSON.parse(errorText);
-            message = errorData.error || errorData.message || message; // Prioritize specific error
+            message = errorData.error || errorData.message || message;
         } catch (e) {
             if (errorText.toLowerCase().includes("<!doctype html>")) {
                 message = `Failed to fetch orders for ${partnerName}. Server returned an HTML error. Check server logs.`;
@@ -70,6 +70,7 @@ function AssignedOrdersPopoverContent({ partnerId, partnerName }: AssignedOrders
 
   const activeOrders = allFetchedOrders.filter(order => order.status === 'assigned' || order.status === 'picked');
   const deliveredOrders = allFetchedOrders.filter(order => order.status === 'delivered');
+  const cancelledOrders = allFetchedOrders.filter(order => order.status === 'cancelled');
 
   if (isLoading) {
     return (
@@ -84,13 +85,13 @@ function AssignedOrdersPopoverContent({ partnerId, partnerName }: AssignedOrders
     return <div className="p-4 text-destructive text-sm">Error: {error}</div>;
   }
 
-  if (activeOrders.length === 0 && deliveredOrders.length === 0) {
+  if (activeOrders.length === 0 && deliveredOrders.length === 0 && cancelledOrders.length === 0) {
     return <div className="p-4 text-muted-foreground text-sm">No orders found for {partnerName}.</div>;
   }
 
   return (
-    <ScrollArea className="max-h-72 w-80 p-1"> {/* Adjusted width and added ScrollArea */}
-      <div className="p-3 space-y-4"> {/* Reduced padding slightly */}
+    <ScrollArea className="max-h-80 w-80 p-1"> {/* Adjusted width and max-height */}
+      <div className="p-3 space-y-3">
         {activeOrders.length > 0 && (
           <div>
             <h4 className="font-semibold text-sm mb-1.5 flex items-center">
@@ -99,7 +100,7 @@ function AssignedOrdersPopoverContent({ partnerId, partnerName }: AssignedOrders
             </h4>
             <ul className="space-y-1 text-xs list-disc list-inside pl-2 text-muted-foreground">
               {activeOrders.map(order => (
-                <li key={order.id} className="truncate">
+                <li key={order.id} className="truncate" title={order.id}>
                   ID: {order.id.substring(0, 8)}... ({order.status})
                 </li>
               ))}
@@ -115,7 +116,23 @@ function AssignedOrdersPopoverContent({ partnerId, partnerName }: AssignedOrders
             </h4>
             <ul className="space-y-1 text-xs list-disc list-inside pl-2 text-muted-foreground">
               {deliveredOrders.map(order => (
-                <li key={order.id} className="truncate">
+                <li key={order.id} className="truncate" title={order.id}>
+                  ID: {order.id.substring(0, 8)}...
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {cancelledOrders.length > 0 && (
+          <div>
+            <h4 className="font-semibold text-sm mb-1.5 flex items-center">
+              <PackageX className="h-4 w-4 mr-1.5 text-destructive" />
+              Cancelled Orders ({cancelledOrders.length}):
+            </h4>
+            <ul className="space-y-1 text-xs list-disc list-inside pl-2 text-muted-foreground">
+              {cancelledOrders.map(order => (
+                <li key={order.id} className="truncate" title={order.id}>
                   ID: {order.id.substring(0, 8)}...
                 </li>
               ))}
@@ -123,7 +140,7 @@ function AssignedOrdersPopoverContent({ partnerId, partnerName }: AssignedOrders
           </div>
         )}
         
-        {(activeOrders.length > 0 || deliveredOrders.length > 0) && (
+        {(activeOrders.length > 0 || deliveredOrders.length > 0 || cancelledOrders.length > 0) && (
           <Button variant="link" size="sm" asChild className="p-0 h-auto text-primary hover:underline mt-2 text-xs">
             <Link href={`/orders?assignedPartnerId=${partnerId}`}>
               View All Orders for Partner
@@ -135,6 +152,12 @@ function AssignedOrdersPopoverContent({ partnerId, partnerName }: AssignedOrders
   );
 }
 
+
+interface PartnerTableProps {
+  partners: Partner[];
+  onEditPartner: (partnerId: string) => void;
+  onDeletePartner: (partnerId: string) => void;
+}
 
 type SortKey = keyof Partner | '';
 
@@ -287,7 +310,7 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent 
-                        className="w-auto p-0" // Remove padding from PopoverContent itself
+                        className="w-auto p-0"
                         onOpenAutoFocus={(e) => e.preventDefault()} 
                       >
                         <AssignedOrdersPopoverContent partnerId={partner.id} partnerName={partner.name} />
@@ -305,13 +328,17 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         {onEditPartner && (
-                          <DropdownMenuItem onClick={() => onEditPartner(partner.id)}>
+                          <DropdownMenuItem onClick={() => {
+                            console.log(`[PartnerTable] Edit clicked for partner ID: ${partner.id}`);
+                            onEditPartner(partner.id);
+                          }}>
                             <Edit2 className="mr-2 h-4 w-4" /> Edit
                           </DropdownMenuItem>
                         )}
                         {onDeletePartner && (
                           <DropdownMenuItem 
                             onClick={() => {
+                              console.log(`[PartnerTable] Delete DropdownMenuItem clicked for partner ID: ${partner.id}`);
                               if (onDeletePartner) {
                                 onDeletePartner(partner.id);
                               }

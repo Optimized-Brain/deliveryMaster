@@ -24,7 +24,7 @@ export interface Partner {
   registrationDate: string; // ISO string (maps to created_at from Supabase)
 }
 
-export type OrderStatus = 'pending' | 'assigned' | 'picked' | 'delivered';
+export type OrderStatus = 'pending' | 'assigned' | 'picked' | 'delivered' | 'cancelled';
 
 export interface Order {
   id: string;
@@ -35,7 +35,7 @@ export interface Order {
   area: string;
   creationDate: string; // ISO string maps to orders.created_at
   deliveryAddress: string; // maps to orders.customer_address
-  assignedPartnerId?: string; // maps to orders.assigned_to (UUID)
+  assignedPartnerId?: string | null; // maps to orders.assigned_to (UUID)
   orderValue: number; // maps to orders.total_amount
 }
 
@@ -46,7 +46,7 @@ export type Assignment = {
   orderId: string;
   partnerId: string;
   timestamp: string; // Supabase created_at for the assignment record
-  status: AssignmentStatus; 
+  status: AssignmentStatus;
   reason?: string; // Reason for failure, if status is 'failed'
 };
 
@@ -56,7 +56,7 @@ export interface FailedAssignmentInfo {
   customerName: string;
   area: string;
   failureReason: string;
-  reportedAt: string; // Timestamp of when the assignment record was created/updated (assignments.created_at or assignments.updated_at)
+  reportedAt: string; // Timestamp of when the assignment record was created/updated (assignments.created_at)
 }
 
 

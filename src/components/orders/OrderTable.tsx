@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { ArrowUpDown, MoreHorizontal, Eye, Truck, CheckCircle2, AlertCircle } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, Eye, Truck, CheckCircle2, AlertCircle, XCircle } from "lucide-react"; // Added XCircle
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -68,6 +68,7 @@ export function OrderTable({
       case 'assigned': return 'default';
       case 'picked': return 'outline';
       case 'delivered': return 'default'; 
+      case 'cancelled': return 'destructive';
       default: return 'secondary';
     }
   };
@@ -77,6 +78,7 @@ export function OrderTable({
       case 'delivered': return 'bg-emerald-500 hover:bg-emerald-600 text-white';
       case 'assigned': return 'bg-blue-500 hover:bg-blue-600 text-white';
       case 'picked': return 'bg-amber-500 hover:bg-amber-600 text-white';
+      case 'cancelled': return 'bg-red-500 hover:bg-red-600 text-white';
       default: return '';
     }
   }

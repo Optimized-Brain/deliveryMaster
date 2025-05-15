@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { Order } from "@/lib/types";
+import type { Order, OrderStatus } from "@/lib/types";
 import {
   Dialog,
   DialogContent,
@@ -27,20 +27,22 @@ export function OrderDetailsDialog({ order, isOpen, onOpenChange }: OrderDetails
     return null;
   }
 
-  const getStatusBadgeVariant = (status: Order["status"]) => {
+  const getStatusBadgeVariant = (status: OrderStatus) => {
     switch (status) {
       case 'pending': return 'secondary';
       case 'assigned': return 'default';
       case 'picked': return 'outline';
       case 'delivered': return 'default';
+      case 'cancelled': return 'destructive';
       default: return 'secondary';
     }
   };
-   const getStatusBadgeClass = (status: Order["status"]) => {
+   const getStatusBadgeClass = (status: OrderStatus) => {
      switch (status) {
       case 'delivered': return 'bg-emerald-500 hover:bg-emerald-600 text-white';
       case 'assigned': return 'bg-blue-500 hover:bg-blue-600 text-white';
       case 'picked': return 'bg-amber-500 hover:bg-amber-600 text-white';
+      case 'cancelled': return 'bg-red-500 hover:bg-red-600 text-white';
       default: return '';
     }
   }
