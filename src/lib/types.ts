@@ -49,13 +49,30 @@ export interface Metric {
   changeType?: 'positive' | 'negative' | 'neutral';
 }
 
+// status in assignments table is 'success' or 'failed' (outcome) or 'active' (initial)
+// or NULL depending on schema for initial state.
+// The CHECK constraint in DB for assignments.status is `status = ANY (ARRAY['success'::text, 'failed'::text])`
+// And it's NOT NULL. So initial must be 'success' or 'failed'. We chose 'success'.
+export type AssignmentStatus = 'success' | 'failed';
+
 export type Assignment = {
+  id: string; // assignment id
   orderId: string;
   partnerId: string;
-  timestamp: Date;
-  status: 'success' | 'failed';
-  reason?: string;
+  timestamp: string; // Supabase created_at
+  status: AssignmentStatus; // Outcome status: 'success' or 'failed'
+  reason?: string; // Reason for failure, if status is 'failed'
 };
+
+export interface FailedAssignmentInfo {
+  assignmentId: string;
+  orderId: string;
+  customerName: string;
+  area: string;
+  failureReason: string;
+  reportedAt: string; // Timestamp of when the failure was reported (assignments.updated_at)
+}
+
 
 export type AssignmentMetrics = {
   totalAssigned: number;
@@ -72,3 +89,4 @@ export interface DailyOrdersChartData {
   date: string; // Format: "MMM d"
   orders: number;
 }
+

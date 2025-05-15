@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { MetricsGrid } from "@/components/dashboard/MetricsGrid";
 import { RecentActivityChart } from "@/components/dashboard/RecentActivityChart";
+import { FailedAssignmentsList } from "@/components/dashboard/FailedAssignmentsList"; // Import new component
 import { DASHBOARD_METRICS_CONFIG } from "@/lib/constants";
 import type { Metric, Order } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -148,6 +149,11 @@ export default function DashboardPage() {
               />
           </CardContent>
         </Card>
+      </div>
+      
+      {/* New Section for Failed Assignments */}
+      <div className="grid grid-cols-1 gap-6">
+        <FailedAssignmentsList />
       </div>
     </div>
   );
