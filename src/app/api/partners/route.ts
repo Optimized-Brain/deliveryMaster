@@ -6,17 +6,23 @@ import { PARTNER_STATUSES } from '@/lib/constants';
 
 // GET /api/partners
 export async function GET(request: Request) {
+  // Log directly within the API route handler
+  console.log("/api/partners GET: NEXT_PUBLIC_SUPABASE_URL =", process.env.NEXT_PUBLIC_SUPABASE_URL ? "Exists" : "MISSING_OR_EMPTY");
+  console.log("/api/partners GET: NEXT_PUBLIC_SUPABASE_ANON_KEY =", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "Exists" : "MISSING_OR_EMPTY");
+
   console.log("GET /api/partners received request");
 
   const supabaseUrlPresent = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKeyPresent = !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  console.log(`Supabase URL Present: ${supabaseUrlPresent}, Supabase Anon Key Present: ${supabaseAnonKeyPresent}`);
+  // This log was already here and is good.
+  console.log(`Supabase URL Present (from GET /api/partners): ${supabaseUrlPresent}, Supabase Anon Key Present (from GET /api/partners): ${supabaseAnonKeyPresent}`);
 
+  // This check is redundant if supabase client initializes, but good for belt-and-suspenders
   if (!supabaseUrlPresent || !supabaseAnonKeyPresent) {
-    console.error("Supabase environment variables are missing!");
+    console.error("API Route /api/partners: Supabase environment variables are missing according to direct process.env check!");
     return NextResponse.json({ 
-        message: 'Server configuration error: Supabase environment variables are missing.', 
-        error: 'Supabase environment variables are missing.' 
+        message: 'Server configuration error: Supabase environment variables are missing (checked in API route).', 
+        error: 'Supabase environment variables are missing (checked in API route).' 
     }, { status: 500 });
   }
 
@@ -35,8 +41,6 @@ export async function GET(request: Request) {
         query = query.eq('status', statusFilter);
       } else {
         console.warn(`Invalid status filter received: ${statusFilter}. Fetching all partners.`);
-        // Potentially return a 400 error for invalid filter value if strictness is desired
-        // return NextResponse.json({ message: `Invalid status filter: ${statusFilter}` }, { status: 400 });
       }
     }
     
@@ -56,7 +60,7 @@ export async function GET(request: Request) {
 
     if (!data) {
       console.log('No partners found or data is null.');
-      return NextResponse.json([]); // Return empty array if no data, not an error
+      return NextResponse.json([]);
     }
 
     console.log(`Successfully fetched ${data.length} partners.`);
@@ -112,7 +116,6 @@ export async function POST(request: Request) {
       current_load: body.currentLoad ?? 0,
       rating: body.rating ?? 0,
       avatar_url: body.avatarUrl,
-      // created_at will be set by Supabase
     };
     console.log('Attempting to insert new partner:', newPartnerData);
 
@@ -149,7 +152,7 @@ export async function POST(request: Request) {
       currentLoad: data.current_load ?? 0,
       rating: data.rating ?? 0,
       avatarUrl: data.avatar_url,
-      registrationDate: data.created_at, // map created_at from Supabase
+      registrationDate: data.created_at,
     };
 
     return NextResponse.json({ message: 'Partner created successfully', partner: createdPartner }, { status: 201 });
@@ -159,6 +162,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ 
       message: 'Failed to create partner due to unexpected server error.', 
       error: String(errorMessage) 
-    }, { status: 500 }); // Changed status to 500 for unexpected server errors
+    }, { status: 500 });
   }
 }
+
