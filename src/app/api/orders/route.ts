@@ -10,7 +10,6 @@ export async function GET(request: Request) {
   const statusFilter = searchParams.get('status') as OrderStatus | null;
   const assignedPartnerIdFilter = searchParams.get('assignedPartnerId');
 
-  console.log("GET /api/orders - Using Supabase logic");
   let query = supabase.from('orders').select('id, customer_name, customer_phone, items, status, area, created_at, customer_address, assigned_to, total_amount');
 
   if (statusFilter) {
@@ -26,7 +25,6 @@ export async function GET(request: Request) {
   const { data, error } = await query;
 
   if (error) {
-    console.error('Error fetching orders from Supabase:', error);
     return NextResponse.json({ message: 'Error fetching orders', error: error.message }, { status: 500 });
   }
 
@@ -63,7 +61,6 @@ const createOrderSchema = z.object({
 
 // POST /api/orders - Create a new order
 export async function POST(request: Request) {
-  console.log("POST /api/orders received request");
   try {
     const body = await request.json();
 
@@ -83,8 +80,6 @@ export async function POST(request: Request) {
       total_amount: validatedData.orderValue,
     };
 
-    console.log('Attempting to insert new order into Supabase:', newOrderSupabaseData);
-
     const { data, error } = await supabase
       .from('orders')
       .insert(newOrderSupabaseData)
@@ -92,7 +87,6 @@ export async function POST(request: Request) {
       .single();
 
     if (error) {
-      console.error('Error creating order in Supabase:', JSON.stringify(error, null, 2));
       return NextResponse.json({
         message: 'Error creating order in Supabase.',
         error: error.message,
@@ -101,11 +95,9 @@ export async function POST(request: Request) {
     }
 
     if (!data) {
-      console.error('Failed to create order, no data returned after insert from Supabase.');
       return NextResponse.json({ message: 'Failed to create order, no data returned. Possible RLS issue or misconfiguration.' }, { status: 500 });
     }
 
-    console.log('Order created successfully in Supabase:', data.id);
     const createdOrder: Order = {
       id: data.id,
       customerName: data.customer_name,
@@ -122,7 +114,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Order created successfully', order: createdOrder }, { status: 201 });
 
   } catch (e: unknown) {
-    console.error('Unexpected error in POST /api/orders:', e);
     let errorMessage = 'Invalid request body or unexpected server error.';
     if (e instanceof Error && e.name === 'SyntaxError' && e.message.includes('JSON')) {
         errorMessage = 'Invalid request body: Malformed JSON.';

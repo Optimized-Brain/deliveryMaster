@@ -16,13 +16,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Reason must be at least 10 characters long.' }, { status: 400 });
     }
 
-    console.log(`POST /api/assignments/report-failure: Attempting to report failure for orderId: ${orderId}`);
-
-    // Step 1: Find the latest assignment for the orderId
-    console.log(`POST /api/assignments/report-failure: Querying for latest assignment for orderId: ${orderId} using select('*').eq('order_id', orderId).order('created_at', { ascending: false }).limit(1).single()`);
     const { data: latestAssignment, error: latestAssignmentError } = await supabase
       .from('assignments')
-      .select('*') // Select all columns to ensure RLS doesn't hide it based on selected columns
+      .select('*') 
       .eq('order_id', orderId)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -30,26 +26,20 @@ export async function POST(request: Request) {
 
     if (latestAssignmentError) {
       const errorMessage = `Error fetching assignment record for order ID ${orderId}. Supabase error: ${latestAssignmentError.message}`;
-      console.error(`POST /api/assignments/report-failure: ${errorMessage}. Code: ${latestAssignmentError.code}, Details: ${latestAssignmentError.details}. Full Error:`, JSON.stringify(latestAssignmentError, null, 2));
-      // If the error indicates "0 rows", it means the record wasn't found.
-      if (latestAssignmentError.code === 'PGRST116') { // PGRST116: "Actual num rows 0 differs from expected 1"
+      if (latestAssignmentError.code === 'PGRST116') { 
          const notFoundMessage = `Could not find an assignment record for order ID ${orderId} to update. (PGRST116)`;
-         console.warn(`POST /api/assignments/report-failure: ${notFoundMessage}`);
          return NextResponse.json({ message: notFoundMessage }, { status: 404 });
       }
       return NextResponse.json({ message: 'Database error while fetching assignment record.', error: latestAssignmentError.message }, { status: 500 });
     }
     
-    if (!latestAssignment) { // Should ideally be caught by PGRST116 from .single() if no error, but defensive check
+    if (!latestAssignment) { 
       const errorMessage = `Could not find an assignment record for order ID ${orderId} to update. (No data returned from query, though no direct Supabase error was reported for the query itself). This could indicate an RLS issue silently filtering the record.`;
-      console.warn(`POST /api/assignments/report-failure: ${errorMessage}`);
       return NextResponse.json({ message: errorMessage }, { status: 404 });
     }
 
     const assignmentIdToUpdate = latestAssignment.id;
-    console.log(`POST /api/assignments/report-failure: Found latest assignment record with ID: ${assignmentIdToUpdate} for orderId: ${orderId}`);
 
-    // Step 2: Update the assignment record
     const { error: updateAssignmentError } = await supabase
       .from('assignments')
       .update({
@@ -59,12 +49,9 @@ export async function POST(request: Request) {
       .eq('id', assignmentIdToUpdate);
 
     if (updateAssignmentError) {
-      console.error(`POST /api/assignments/report-failure: Error updating assignment ${assignmentIdToUpdate} for order ${orderId}:`, updateAssignmentError);
       return NextResponse.json({ message: 'Failed to update assignment record.', error: updateAssignmentError.message }, { status: 500 });
     }
-    console.log(`POST /api/assignments/report-failure: Successfully updated assignment ${assignmentIdToUpdate} to status 'failed'.`);
 
-    // Step 3: Update the order status to 'pending' and clear assigned_to (partner)
     const newOrderStatus: OrderStatus = 'pending';
     const { data: updatedOrder, error: updateOrderError } = await supabase
       .from('orders')
@@ -77,22 +64,16 @@ export async function POST(request: Request) {
       .single();
 
     if (updateOrderError) {
-      console.error(`POST /api/assignments/report-failure: Error updating order ${orderId} status to pending and clearing partner:`, updateOrderError);
-      // If order update fails after assignment update, this is a partial success/failure state.
-      // The assignment record *was* updated.
       return NextResponse.json({ message: 'Assignment issue reported and assignment record updated, but failed to revert order status/clear partner.', error: updateOrderError.message }, { status: 500 });
     }
     
-    if (!updatedOrder) { // Should ideally be caught by PGRST116 from .single() if order doesn't exist
-         console.warn(`POST /api/assignments/report-failure: Order ${orderId} not found during status revert, though assignment was updated. This is unexpected if the order existed initially.`);
+    if (!updatedOrder) { 
          return NextResponse.json({ message: 'Assignment issue reported, but order not found for status revert.' }, { status: 404 });
     }
-    console.log(`POST /api/assignments/report-failure: Successfully reverted order ${orderId} to 'pending' status and cleared assigned partner.`);
 
     return NextResponse.json({ message: 'Assignment issue reported successfully. Order status set to pending and assignment record updated.' });
 
   } catch (e) {
-    console.error('POST /api/assignments/report-failure: Unexpected error:', e);
      if (e instanceof SyntaxError && e.message.includes('JSON')) {
         return NextResponse.json({ message: 'Invalid request body: Malformed JSON.', error: e.message }, { status: 400 });
     }
