@@ -19,7 +19,8 @@ export async function POST(request: Request) {
     console.log(`POST /api/assignments/report-failure: Attempting to report failure for orderId: ${orderId}`);
 
     // Step 1: Find the latest assignment for the orderId
-    const { data: assignmentData, error: assignmentError } = await supabase
+    // Assuming 'created_at' is the timestamp column in your 'assignments' table
+    const { data: latestAssignment, error: latestAssignmentError } = await supabase
       .from('assignments')
       .select('id')
       .eq('order_id', orderId)
@@ -27,54 +28,55 @@ export async function POST(request: Request) {
       .limit(1)
       .single();
 
-    if (assignmentError || !assignmentData) {
+    if (latestAssignmentError || !latestAssignment) {
       const errorMessage = `Could not find an assignment record for order ID ${orderId} to update.`;
-      console.error(`POST /api/assignments/report-failure: ${errorMessage} Supabase error (if any):`, assignmentError?.message);
-      return NextResponse.json({ message: errorMessage, error: assignmentError?.message }, { status: 404 });
+      console.error(`POST /api/assignments/report-failure: ${errorMessage} Supabase error (if any):`, latestAssignmentError?.message);
+      return NextResponse.json({ message: errorMessage, error: latestAssignmentError?.message }, { status: 404 });
     }
 
-    const assignmentId = assignmentData.id;
-    console.log(`POST /api/assignments/report-failure: Found assignment record with ID: ${assignmentId} for orderId: ${orderId}`);
+    const assignmentIdToUpdate = latestAssignment.id;
+    console.log(`POST /api/assignments/report-failure: Found latest assignment record with ID: ${assignmentIdToUpdate} for orderId: ${orderId}`);
 
     // Step 2: Update the assignment record
     const { error: updateAssignmentError } = await supabase
       .from('assignments')
       .update({
-        status: 'failed', 
-        reason: reason,   
+        status: 'failed', // As per the Assignment type
+        reason: reason,
       })
-      .eq('id', assignmentId);
+      .eq('id', assignmentIdToUpdate);
 
     if (updateAssignmentError) {
-      console.error(`POST /api/assignments/report-failure: Error updating assignment ${assignmentId} for order ${orderId}:`, updateAssignmentError);
+      console.error(`POST /api/assignments/report-failure: Error updating assignment ${assignmentIdToUpdate} for order ${orderId}:`, updateAssignmentError);
       return NextResponse.json({ message: 'Failed to update assignment record.', error: updateAssignmentError.message }, { status: 500 });
     }
-    console.log(`POST /api/assignments/report-failure: Successfully updated assignment ${assignmentId} to failed.`);
+    console.log(`POST /api/assignments/report-failure: Successfully updated assignment ${assignmentIdToUpdate} to status 'failed'.`);
 
-    // Step 3: Update the order status to 'pending' and clear assigned partner
+    // Step 3: Update the order status to 'pending' and clear assigned_to (partner)
     const newOrderStatus: OrderStatus = 'pending';
     const { data: updatedOrder, error: updateOrderError } = await supabase
       .from('orders')
       .update({
         status: newOrderStatus,
-        assigned_to: null, 
+        assigned_to: null, // Clear the assigned partner
       })
       .eq('id', orderId)
-      .select()
+      .select('id') // Select minimal data for confirmation
       .single();
 
     if (updateOrderError) {
-      console.error(`POST /api/assignments/report-failure: Error updating order ${orderId} status to pending:`, updateOrderError);
-      return NextResponse.json({ message: 'Assignment issue reported, but failed to revert order status to pending.', error: updateOrderError.message }, { status: 500 });
+      console.error(`POST /api/assignments/report-failure: Error updating order ${orderId} status to pending and clearing partner:`, updateOrderError);
+      return NextResponse.json({ message: 'Assignment issue reported and assignment record updated, but failed to revert order status/clear partner.', error: updateOrderError.message }, { status: 500 });
     }
     
     if (!updatedOrder) {
          console.warn(`POST /api/assignments/report-failure: Order ${orderId} not found during status revert, though assignment was updated.`);
+         // This case might be unlikely if the previous check for assignment passed, but good to be cautious
          return NextResponse.json({ message: 'Assignment issue reported, but order not found for status revert.' }, { status: 404 });
     }
-    console.log(`POST /api/assignments/report-failure: Successfully reverted order ${orderId} to pending status.`);
+    console.log(`POST /api/assignments/report-failure: Successfully reverted order ${orderId} to 'pending' status and cleared assigned partner.`);
 
-    return NextResponse.json({ message: 'Assignment issue reported successfully. Order status set to pending.' });
+    return NextResponse.json({ message: 'Assignment issue reported successfully. Order status set to pending and assignment record updated.' });
 
   } catch (e) {
     console.error('POST /api/assignments/report-failure: Unexpected error:', e);
