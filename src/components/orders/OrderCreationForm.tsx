@@ -56,7 +56,9 @@ export function OrderCreationForm({ onOrderCreated }: OrderCreationFormProps) {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create order');
+        // Prioritize the 'error' field (specific Supabase error), then 'message', then a fallback.
+        const detailedErrorMessage = errorData.error || errorData.message || 'Failed to create order';
+        throw new Error(detailedErrorMessage);
       }
 
       const result = await response.json();
