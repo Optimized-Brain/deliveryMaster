@@ -89,7 +89,10 @@ export function OrderCreationForm({ onOrderCreated }: OrderCreationFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
+      <form 
+        onSubmit={form.handleSubmit(onSubmit)} 
+        className="space-y-6 py-4 max-h-[70vh] overflow-y-auto pr-2"
+      >
         <FormField
           control={form.control}
           name="customerName"
