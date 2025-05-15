@@ -18,7 +18,6 @@ export async function PUT(request: Request, context: { params: Params }) {
       return NextResponse.json({ message: 'Status is required' }, { status: 400 });
     }
     
-    // Validate status if necessary
     const validStatuses: OrderStatus[] = ['pending', 'assigned', 'in-transit', 'delivered', 'cancelled'];
     if (!validStatuses.includes(status)) {
         return NextResponse.json({ message: `Invalid status: ${status}` }, { status: 400 });
@@ -56,7 +55,7 @@ export async function PUT(request: Request, context: { params: Params }) {
             items: data.items || [],
             status: data.status as OrderStatus,
             area: data.area,
-            creationDate: data.creation_date,
+            creationDate: data.created_at, // Map created_at to creationDate
             deliveryAddress: data.delivery_address,
             assignedPartnerId: data.assigned_partner_id,
             orderValue: data.order_value,
