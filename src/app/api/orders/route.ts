@@ -1,6 +1,6 @@
 
 import { NextResponse } from 'next/server';
-// import { supabase } from '@/lib/supabase'; // Supabase logic bypassed for demo
+import { supabase } from '@/lib/supabase';
 import type { Order, OrderStatus } from '@/lib/types';
 import { SAMPLE_ORDERS } from '@/lib/constants'; // Using sample data for demo
 
@@ -24,6 +24,7 @@ export async function GET(request: Request) {
 
   /*
   // --- Original Supabase logic ---
+  console.log("GET /api/orders - Using Supabase logic");
   let query = supabase.from('orders').select('*');
 
   if (statusFilter) {
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
   const { data, error } = await query;
 
   if (error) {
-    console.error('Error fetching orders:', error);
+    console.error('Error fetching orders from Supabase:', error);
     return NextResponse.json({ message: 'Error fetching orders', error: error.message }, { status: 500 });
   }
 
@@ -47,7 +48,7 @@ export async function GET(request: Request) {
     area: o.area,
     creationDate: o.created_at, // Map created_at to creationDate
     deliveryAddress: o.delivery_address,
-    assignedPartnerId: o.assigned_partner_id,
+    assignedPartnerId: o.assigned_to, // Mapped from assigned_to
     orderValue: o.order_value,
   }));
 

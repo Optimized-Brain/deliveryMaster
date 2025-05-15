@@ -23,9 +23,9 @@ export async function PUT(request: Request, context: { params: Params }) {
         return NextResponse.json({ message: `Invalid status: ${status}` }, { status: 400 });
     }
 
-    const updateData: { status: OrderStatus; assigned_partner_id?: string } = { status };
+    const updateData: { status: OrderStatus; assigned_to?: string } = { status };
     if (assignedPartnerId) {
-      updateData.assigned_partner_id = assignedPartnerId;
+      updateData.assigned_to = assignedPartnerId;
     }
 
     const { data, error } = await supabase
@@ -58,7 +58,7 @@ export async function PUT(request: Request, context: { params: Params }) {
             area: data.area,
             creationDate: data.created_at,
             deliveryAddress: data.delivery_address,
-            assignedPartnerId: data.assigned_partner_id,
+            assignedPartnerId: data.assigned_to, // Mapped from assigned_to
             orderValue: data.order_value,
         }
     });
@@ -73,4 +73,3 @@ export async function PUT(request: Request, context: { params: Params }) {
     return NextResponse.json({ message: 'Unexpected server error during order update.', error: errorInstance.message }, { status: 500 });
   }
 }
-
