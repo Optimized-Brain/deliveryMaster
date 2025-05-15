@@ -6,7 +6,7 @@ import type { Partner, PartnerStatus } from '@/lib/types';
 // GET /api/partners
 export async function GET(request: Request) {
   const { data, error } = await supabase
-    .from('partners')
+    .from('delivery_partners') // Changed from 'partners'
     .select('*')
     .order('name', { ascending: true });
 
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     };
 
     const { data, error } = await supabase
-      .from('partners')
+      .from('delivery_partners') // Changed from 'partners'
       .insert(newPartnerData)
       .select()
       .single(); // Use .single() if you expect one row back

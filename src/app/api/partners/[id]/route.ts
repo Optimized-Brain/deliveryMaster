@@ -34,7 +34,7 @@ export async function PUT(request: Request, context: { params: Params }) {
     }
 
     const { data, error } = await supabase
-      .from('partners')
+      .from('delivery_partners') // Changed from 'partners'
       .update(updateData)
       .eq('id', id)
       .select()
@@ -78,7 +78,7 @@ export async function DELETE(request: Request, context: { params: Params }) {
   const { id } = context.params;
 
   const { error } = await supabase
-    .from('partners')
+    .from('delivery_partners') // Changed from 'partners'
     .delete()
     .eq('id', id);
 
