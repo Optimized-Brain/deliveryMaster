@@ -34,7 +34,7 @@ export const SAMPLE_ORDERS: Order[] = [
     customerName: 'Rajesh Kumar',
     customerPhone: '+91 99887 76655',
     items: [{ name: 'Hyderabadi Biryani', quantity: 2 }],
-    status: 'delivered', // Changed for testing
+    status: 'delivered',
     assignedPartnerId: DUMMY_PARTNER_UUID_1,
     area: 'Bandra',
     creationDate: "2024-05-15T11:00:00.000Z",
@@ -57,7 +57,7 @@ export const SAMPLE_ORDERS: Order[] = [
     customerName: 'Vikram Patel',
     customerPhone: '+91 92345 67890',
     items: [{ name: 'Masala Dosa', quantity: 2 }, { name: 'Filter Coffee', quantity: 2 }],
-    status: 'delivered', // Changed for testing
+    status: 'delivered',
     assignedPartnerId: DUMMY_PARTNER_UUID_2,
     area: 'T. Nagar',
     creationDate: "2023-04-14T16:45:00.000Z", // Older date for 30-day testing
@@ -149,7 +149,6 @@ export const SAMPLE_ORDERS: Order[] = [
   },
 ];
 
-
 // Initial structure for dashboard metrics. Values will be updated dynamically in DashboardPage.tsx
 export const DASHBOARD_METRICS_CONFIG: Omit<Metric, 'value' | 'change' | 'changeType'>[] = [
   {
@@ -164,12 +163,12 @@ export const DASHBOARD_METRICS_CONFIG: Omit<Metric, 'value' | 'change' | 'change
   },
   {
     id: 'metric-delivered-orders',
-    title: 'Total Delivered Orders', // Updated Title
+    title: 'Total Delivered Orders',
     icon: BarChart3,
   },
   {
     id: 'metric-avg-order-value',
-    title: 'Avg. Order Value',
+    title: 'Avg. Order Value (₹)',
     icon: DollarSign,
   },
 ];

@@ -48,25 +48,32 @@ export default function OrdersPage() {
 
 
   const fetchOrders = useCallback(async () => {
+    console.log("[OrdersPage Fetch] Starting fetchOrders...");
     setIsLoading(true);
     try {
       const response = await fetch('/api/orders');
+      console.log("[OrdersPage Fetch] API response status:", response.status);
       if (!response.ok) {
         let errorMessage = `Failed to fetch orders (status: ${response.status})`;
         try {
           const responseText = await response.text();
+          console.error("[OrdersPage Fetch] Raw error response from /api/orders:", responseText);
           if (responseText.startsWith('{') || responseText.startsWith('[')) {
              const errorData = JSON.parse(responseText);
              errorMessage = errorData.error || errorData.message || errorMessage;
-          } else if (responseText.startsWith("<!DOCTYPE html>")) {
+          } else if (responseText.toLowerCase().includes("<!doctype html>")) {
             errorMessage = `Failed to fetch orders. Server returned an HTML error page (status: ${response.status}). Check server logs.`;
+          } else {
+             errorMessage = `Failed to fetch orders. Server returned a non-JSON error response (status: ${response.status}). Check server logs.`;
           }
         } catch (jsonParseError) {
-           errorMessage = `Failed to fetch orders. Server returned a non-JSON error response (status: ${response.status}). Check server logs.`;
+           console.error("[OrdersPage Fetch] Failed to parse JSON error response from /api/orders:", jsonParseError);
+           errorMessage = `Failed to fetch orders. Server returned a non-JSON error response that also failed to parse (status: ${response.status}). Check server logs.`;
         }
         throw new Error(errorMessage);
       }
       const data: Order[] = await response.json();
+      console.log(`[OrdersPage Fetch] Successfully fetched ${data.length} orders.`);
       setAllOrders(data);
     } catch (error) {
       console.error("[OrdersPage Fetch] Error caught in fetchOrders:", error);
@@ -75,9 +82,10 @@ export default function OrdersPage() {
         description: (error as Error).message,
         variant: "destructive",
       });
-      setAllOrders([]);
+      setAllOrders([]); // Ensure orders list is cleared on error
     } finally {
       setIsLoading(false);
+      console.log("[OrdersPage Fetch] fetchOrders finished.");
     }
   }, [toast]);
 

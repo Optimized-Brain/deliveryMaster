@@ -39,7 +39,7 @@ export interface Order {
   orderValue: number; // maps to orders.total_amount
 }
 
-export type AssignmentStatus = 'success' | 'failed' | 'active' ; // 'active' for initial state
+export type AssignmentStatus = 'success' | 'failed' | 'active' ;
 
 export type Assignment = {
   id: string; // assignment id
@@ -59,16 +59,14 @@ export interface FailedAssignmentInfo {
   reportedAt: string; // Timestamp of when the assignment record was created/updated (assignments.created_at)
 }
 
-
-export type AssignmentMetrics = {
-  totalAssigned: number;
-  successRate: number; // e.g., 0.95 for 95%
-  averageTime: number; // e.g., in minutes or seconds
-  failureReasons: {
-    reason: string;
-    count: number;
-  }[];
-};
+export interface Metric {
+  id: string;
+  title: string;
+  value: string | number;
+  icon: LucideIcon;
+  change?: string;
+  changeType?: 'positive' | 'negative' | 'neutral';
+}
 
 // Type for chart data
 export interface DailyOrdersChartData {

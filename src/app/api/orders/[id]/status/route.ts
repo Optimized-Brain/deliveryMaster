@@ -23,8 +23,7 @@ export async function PUT(request: Request, context: { params: Params }) {
     if (!validStatuses.includes(newOrderStatus as OrderStatus)) {
       return NextResponse.json({ message: `Invalid status: ${newOrderStatus}. Valid statuses are: ${validStatuses.join(', ')}` }, { status: 400 });
     }
-
-    // Fetch current order details if cancelling, to get assigned_partner_id for load decrement
+    
     let currentOrderAssignedTo: string | null = null;
     if (newOrderStatus === 'cancelled') {
       const { data: currentOrderData, error: fetchError } = await supabase
@@ -33,7 +32,7 @@ export async function PUT(request: Request, context: { params: Params }) {
         .eq('id', orderId)
         .single();
       
-      if (fetchError && fetchError.code !== 'PGRST116') { // Ignore if order not found, proceed to update
+      if (fetchError && fetchError.code !== 'PGRST116') {
          return NextResponse.json({ message: `Failed to fetch current order details before cancellation: ${fetchError.message}` }, { status: 500 });
       }
       if (currentOrderData) {
@@ -46,7 +45,7 @@ export async function PUT(request: Request, context: { params: Params }) {
     if (newOrderStatus === 'assigned' && assignedPartnerId) {
       orderUpdateData.assigned_to = assignedPartnerId;
     } else if (newOrderStatus === 'pending' || newOrderStatus === 'cancelled') {
-      orderUpdateData.assigned_to = null; // Clear partner assignment for pending or cancelled
+      orderUpdateData.assigned_to = null; 
     }
 
 
@@ -61,7 +60,10 @@ export async function PUT(request: Request, context: { params: Params }) {
       if (orderUpdateError.code === 'PGRST116') {
         return NextResponse.json({ message: `Order with ID ${orderId} not found.` }, { status: 404 });
       }
-      return NextResponse.json({ message: `Order update failed: ${orderUpdateError.message || 'Unknown Supabase error while updating order'}` }, { status: 500 });
+      return NextResponse.json({ 
+        message: `Order update failed: ${orderUpdateError.message || 'Unknown Supabase error while updating order'}`, 
+        error: orderUpdateError.message 
+      }, { status: 500 });
     }
 
     if (!updatedOrderData) {
@@ -83,19 +85,19 @@ export async function PUT(request: Request, context: { params: Params }) {
       const { data: assignmentData, error: assignmentInsertError } = await supabase
         .from('assignments')
         .insert(assignmentLogData)
-        .select('*')
+        .select('*') 
         .single();
 
       if (assignmentInsertError) {
         assignmentLoggedSuccessfully = false;
-        assignmentLogError = `Failed to create assignment record: ${assignmentInsertError.message}. This is a critical issue. Supabase Code: ${assignmentInsertError.code}`;
+        assignmentLogError = `Failed to create assignment record: ${assignmentInsertError.message}. Supabase Code: ${assignmentInsertError.code}`;
         return NextResponse.json({
-          message: `Order status updated to '${newOrderStatus}', but FAILED to log assignment record. Please check server logs for details. Supabase error: ${assignmentLogError}`,
+          message: `Order status updated to '${newOrderStatus}', but FAILED to log assignment record. Please check server logs for details. Error: ${assignmentLogError}`,
           error: assignmentLogError
         }, { status: 500 });
       } else if (!assignmentData) {
           assignmentLoggedSuccessfully = false;
-          assignmentLogError = 'Failed to confirm assignment record creation (no data returned after insert despite no error). This could be an RLS issue. This is a critical issue.';
+          assignmentLogError = 'Failed to confirm assignment record creation (no data returned after insert despite no error). This could be an RLS issue.';
            return NextResponse.json({
               message: `Order status updated to '${newOrderStatus}', but FAILED to confirm assignment record creation (no data returned). Please check server logs. Error: ${assignmentLogError}`,
               error: assignmentLogError
@@ -148,14 +150,14 @@ export async function PUT(request: Request, context: { params: Params }) {
         } else if (!partnerData) {
           partnerLoadUpdateMessage = `Warning: Partner ${currentOrderAssignedTo} not found for load decrement.`;
         } else {
-          const newLoad = Math.max(0, (partnerData.current_load || 0) - 1); // Ensure load doesn't go below 0
+          const newLoad = Math.max(0, (partnerData.current_load || 0) - 1); 
           const { error: partnerUpdateError } = await supabase
             .from('delivery_partners')
             .update({ current_load: newLoad })
             .eq('id', currentOrderAssignedTo);
 
           if (partnerUpdateError) {
-            partnerLoadUpdateMessage = `Warning: Failed to decrement partner ${currentOrderAssignedTo} load: ${partnerUpdateError.message}`;
+            partnerLoadUpdateMessage = `Warning: Failed to decrement partner ${currentOrderAssignedTo} load: ${partnerUpdateError.message}.`;
           } else {
             partnerLoadUpdateMessage = `Partner ${currentOrderAssignedTo.substring(0,8)}... load decremented.`;
           }
@@ -169,8 +171,8 @@ export async function PUT(request: Request, context: { params: Params }) {
         .from('assignments')
         .update({ status: 'failed', reason: 'Order Cancelled' })
         .eq('order_id', orderId)
-        .order('created_at', { ascending: false }) // Target the latest assignment for this order
-        .limit(1); // Update only the latest one
+        .order('created_at', { ascending: false }) 
+        .limit(1); 
       
       if (updateAssignmentError) {
           partnerLoadUpdateMessage += ` Warning: Failed to update assignment record for cancelled order: ${updateAssignmentError.message}.`;
@@ -190,7 +192,7 @@ export async function PUT(request: Request, context: { params: Params }) {
       creationDate: updatedOrderData.created_at,
       deliveryAddress: updatedOrderData.customer_address,
       assignedPartnerId: updatedOrderData.assigned_to,
-      orderValue: updatedOrderData.total_amount,
+      orderValue: Number(updatedOrderData.total_amount) || 0,
     };
 
     let successMessage = `Status for order ${orderId.substring(0,8)}... updated successfully to ${newOrderStatus}.`;

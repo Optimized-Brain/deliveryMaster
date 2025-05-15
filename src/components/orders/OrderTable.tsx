@@ -84,7 +84,7 @@ export function OrderTable({
       case 'delivered': return 'bg-emerald-500 hover:bg-emerald-600 text-white';
       case 'assigned': return 'bg-blue-500 hover:bg-blue-600 text-white';
       case 'picked': return 'bg-amber-500 hover:bg-amber-600 text-white';
-      case 'cancelled': return 'bg-red-600 hover:bg-red-700 text-white'; // Adjusted for cancel
+      case 'cancelled': return 'bg-red-600 hover:bg-red-700 text-white';
       default: return '';
     }
   }
