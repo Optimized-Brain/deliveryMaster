@@ -79,41 +79,34 @@ export async function PUT(request: Request, context: { params: Params }) {
 // DELETE /api/partners/[id]
 export async function DELETE(request: Request, context: { params: Params }) {
   const { id } = context.params;
-  console.log(`[API DELETE /api/partners/${id}] Received request to delete partner with ID: ${id}`);
 
   try {
-    console.log(`[API DELETE /api/partners/${id}] Attempting to delete from Supabase...`);
     const { error, count } = await supabase
       .from('delivery_partners')
       .delete({ count: 'exact' }) 
       .eq('id', id);
 
-    console.log(`[API DELETE /api/partners/${id}] Supabase delete result - Error:`, error, "Count:", count);
-
     if (error) {
-      console.error(`[API DELETE /api/partners/${id}] Supabase error during delete:`, error);
       return NextResponse.json({ 
-        message: `Failed to delete partner with ID ${id}. Please check server logs for details.`, 
-        error: `Supabase error: ${error.message}`,
+        message: `Failed to delete partner with ID ${id}. Supabase error occurred.`, 
+        error: error.message,
         details: String(error.details ?? ''),
         code: error.code 
       }, { status: 500 });
     }
 
     if (count === 0) {
-      console.log(`[API DELETE /api/partners/${id}] Partner not found (count is 0). Returning 404.`);
       return NextResponse.json({
         message: `Partner with ID ${id} not found. No rows were deleted.`,
         error: "Partner not found"
       }, { status: 404 });
     }
-
-    console.log(`[API DELETE /api/partners/${id}] Deletion successful (count: ${count}). Returning 200.`);
-    return NextResponse.json({ message: `Partner ${id} deleted successfully. ${count} row(s) affected.` });
+    
+    // Only if count > 0 and no error, we consider it a success
+    return NextResponse.json({ message: `Partner ${id} deleted successfully. ${count} row(s) affected.` }, { status: 200 });
 
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : 'An unexpected server error occurred during deletion.';
-    console.error(`[API DELETE /api/partners/${id}] Unexpected server error:`, e);
     return NextResponse.json({ message: "Server error during partner deletion.", error: errorMessage }, { status: 500 });
   }
 }

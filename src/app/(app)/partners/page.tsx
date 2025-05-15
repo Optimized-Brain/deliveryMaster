@@ -18,32 +18,27 @@ export default function PartnersPage() {
   const [editingPartner, setEditingPartner] = useState<Partner | null>(null);
 
   const fetchPartners = useCallback(async () => {
-    console.log("[PartnersPage] Fetching partners...");
     setIsLoading(true);
     try {
       const response = await fetch('/api/partners');
-      console.log("[PartnersPage] Fetch partners API response status:", response.status);
       if (!response.ok) {
         let errorDetails = `Failed to fetch partners (status: ${response.status} ${response.statusText})`;
         try {
           const errorText = await response.text();
-          console.error("[PartnersPage] Raw error response from fetching partners:", errorText.substring(0, 500));
           if (errorText.toLowerCase().includes("<!doctype html>")) {
              errorDetails = `Failed to fetch partners. Server returned an HTML error page (status: ${response.status}). Check server logs.`;
           } else if (errorText) {
-            const errorData = JSON.parse(errorText);
+            const errorData = JSON.parse(errorText); // Attempt to parse only if not HTML
             errorDetails = errorData.error || errorData.message || errorDetails;
           }
         } catch (parseError) {
-           console.error("[PartnersPage] Failed to parse error response from fetching partners:", parseError);
+           // Error parsing JSON or non-JSON error response
         }
         throw new Error(errorDetails);
       }
       const data: Partner[] = await response.json();
-      console.log("[PartnersPage] Successfully fetched and parsed partners:", data.length);
       setPartners(data);
     } catch (error) {
-      console.error("[PartnersPage] Error in fetchPartners:", error);
       toast({ 
         title: "Error Loading Partners", 
         description: (error as Error).message, 
@@ -52,7 +47,6 @@ export default function PartnersPage() {
       setPartners([]);
     } finally {
       setIsLoading(false);
-      console.log("[PartnersPage] Finished fetching partners.");
     }
   }, [toast]);
 
@@ -61,7 +55,6 @@ export default function PartnersPage() {
   }, [fetchPartners]);
 
   const handleEditPartner = (partnerId: string) => {
-    console.log("[PartnersPage] handleEditPartner called for ID:", partnerId);
     const partnerToEdit = partners.find(p => p.id === partnerId);
     if (partnerToEdit) {
       setEditingPartner(partnerToEdit);
@@ -73,65 +66,46 @@ export default function PartnersPage() {
   };
 
   const handleDeletePartner = async (partnerId: string) => {
-    console.log(`[PartnersPage] handleDeletePartner ENTERED for ID: ${partnerId}`);
     const partnerToDelete = partners.find(p => p.id === partnerId);
     if (!partnerToDelete) {
       toast({ title: "Error", description: "Partner not found for deletion in local list.", variant: "destructive" });
-      console.error(`[PartnersPage] Partner with ID ${partnerId} not found in local state for deletion.`);
       return;
     }
 
-    console.log(`[PartnersPage] About to confirm deletion for partner: "${partnerToDelete.name}"`);
     if (window.confirm(`Are you sure you want to delete partner "${partnerToDelete.name}"? This action cannot be undone.`)) {
-      console.log(`[PartnersPage] User confirmed deletion for partner: ${partnerToDelete.name}. API call to /api/partners/${partnerId}`);
       try {
         const response = await fetch(`/api/partners/${partnerId}`, { method: 'DELETE' });
-        console.log(`[PartnersPage] DELETE /api/partners/${partnerId} response status: ${response.status}, statusText: ${response.statusText}`);
+        
+        const result = await response.json(); // Always try to parse JSON response
 
-        let responseBody;
-        const responseText = await response.text();
-        try {
-            responseBody = JSON.parse(responseText);
-        } catch (e) {
-            console.error(`[PartnersPage] Could not parse JSON response from delete API for ${partnerId}. Status: ${response.status}. Raw text: ${responseText.substring(0,500)}`);
-            responseBody = { message: responseText || `Non-JSON response from server (status: ${response.status})` };
-        }
-        console.log(`[PartnersPage] DELETE /api/partners/${partnerId} response body:`, responseBody);
-
-
-        if (!response.ok) {
-          const errorDetails = responseBody.message || responseBody.error || `Failed to delete partner ${partnerToDelete.name}. Status: ${response.status}`;
-          console.error(`[PartnersPage] Delete operation failed: ${errorDetails}`);
-          throw new Error(errorDetails);
+        if (!response.ok) { // Check response.ok first
+          throw new Error(result.message || result.error || `Failed to delete partner. Status: ${response.status}`);
         }
         
-        // Assuming response.ok means deletion was successful according to the API logic (which checks Supabase count)
-        console.log(`[PartnersPage] Successfully deleted partner ${partnerId} via API. API Message: ${responseBody.message}`);
+        // Explicitly check if the API confirmed successful deletion (e.g. count > 0 message)
+        // Assuming successful response (200 OK) means deletion was confirmed by API
         setPartners(prevPartners => prevPartners.filter(p => p.id !== partnerId));
-        toast({ title: "Partner Deleted", description: responseBody.message || `Partner ${partnerToDelete.name} has been successfully deleted.`, variant: "default" });
+        toast({ title: "Partner Deleted", description: result.message || `Partner ${partnerToDelete.name} has been successfully deleted.`, variant: "default" });
+
       } catch (error) {
-        console.error(`[PartnersPage] Error during handleDeletePartner for ${partnerId}:`, error);
         toast({ 
-          title: "Deletion Operation Failed", 
+          title: "Deletion Failed", 
           description: (error as Error).message || "An unexpected error occurred during deletion.", 
           variant: "destructive" 
         });
       }
     } else {
-      console.log(`[PartnersPage] User cancelled deletion for partner: ${partnerToDelete.name}`);
       toast({ title: "Deletion Cancelled", description: `Deletion of partner ${partnerToDelete.name} was cancelled.`, variant: "default" });
     }
   };
 
   const handlePartnerRegistered = () => {
-    console.log("[PartnersPage] handlePartnerRegistered called");
     fetchPartners(); 
     setEditingPartner(null); 
     setActiveTab("list"); 
   };
   
   const handlePartnerUpdated = () => {
-    console.log("[PartnersPage] handlePartnerUpdated called");
     fetchPartners();
     setEditingPartner(null);
     setActiveTab("list");
@@ -139,7 +113,6 @@ export default function PartnersPage() {
   }
 
   const handleTabChange = (newTab: string) => {
-    console.log("[PartnersPage] handleTabChange called, new tab:", newTab);
     if (newTab === "list") {
       setEditingPartner(null); 
     }
@@ -147,7 +120,6 @@ export default function PartnersPage() {
   }
 
   const handleAddNewPartnerClick = () => {
-    console.log("[PartnersPage] handleAddNewPartnerClick called");
     setEditingPartner(null); 
     setActiveTab("register");
   }
@@ -196,6 +168,3 @@ export default function PartnersPage() {
     </div>
   );
 }
-    
-
-    
