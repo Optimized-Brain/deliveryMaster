@@ -27,9 +27,10 @@ export async function PUT(request: Request, context: { params: Params }) {
     const orderUpdateData: { status: OrderStatus; assigned_to?: string | null } = { status: newOrderStatus as OrderStatus };
     if (assignedPartnerId && newOrderStatus === 'assigned') {
       orderUpdateData.assigned_to = assignedPartnerId;
-    } else if (newOrderStatus === 'pending') {
+    } else if (newOrderStatus === 'pending') { // If reverting to pending, clear assigned_to
       orderUpdateData.assigned_to = null;
     }
+
 
     const { data: updatedOrderData, error: orderUpdateError } = await supabase
       .from('orders')
@@ -50,26 +51,20 @@ export async function PUT(request: Request, context: { params: Params }) {
     }
 
     let partnerLoadUpdateMessage = "";
-    let assignmentLoggedSuccessfully = true;
+    let assignmentLoggedSuccessfully = false;
     let assignmentLogError = "";
 
 
     if (newOrderStatus === 'assigned' && assignedPartnerId) {
-      // Create base assignment record
-      // The `status` and `reason` fields in the `assignments` table
-      // are intended for later updates (e.g., by an admin after delivery outcome).
-      // The database `CHECK (status IN ('success', 'failed'))` and potential `NOT NULL`
-      // constraint on `status` mean we cannot set an intermediate system status here.
-      // This insert will rely on the database schema:
-      // - If `assignments.status` is nullable, it will be NULL.
-      // - If `assignments.status` is NOT NULL and has a DEFAULT, that default will be used.
-      // - If `assignments.status` is NOT NULL and has NO DEFAULT, this insert will fail,
-      //   which is the correct behavior as the application cannot satisfy the constraint.
+      // Attempt to create base assignment record
+      // To satisfy NOT NULL and CHECK (status IN ('success', 'failed')) constraints,
+      // we set a default status of 'success'. This might be a placeholder
+      // depending on business logic and true initial state desired.
       const assignmentLogData = {
         order_id: orderId,
         partner_id: assignedPartnerId,
-        // DO NOT set `status` here if it's constrained to 'success'/'failed'
-        // and the outcome isn't known yet.
+        status: 'success', // Set initial status to 'success' to satisfy constraints
+        // reason will be NULL initially
       };
 
       const { data: assignmentData, error: assignmentInsertError } = await supabase
@@ -81,19 +76,20 @@ export async function PUT(request: Request, context: { params: Params }) {
       if (assignmentInsertError) {
         assignmentLoggedSuccessfully = false;
         assignmentLogError = `Failed to create assignment record: ${assignmentInsertError.message}. This is a critical issue. Supabase Code: ${assignmentInsertError.code}`;
+        // If assignment logging is critical and fails, return 500
         return NextResponse.json({
-          message: `Order status updated to '${newOrderStatus}', but FAILED to log assignment record. Please check server logs for details. Supabase: ${assignmentLogError}`,
+          message: `Order status updated to '${newOrderStatus}', but FAILED to log assignment record. Please check server logs for details. Supabase error: ${assignmentLogError}`,
           error: assignmentLogError
         }, { status: 500 });
-      }
-
-      if (!assignmentData && assignmentLoggedSuccessfully) {
+      } else if (!assignmentData) {
           assignmentLoggedSuccessfully = false;
           assignmentLogError = 'Failed to confirm assignment record creation (no data returned after insert despite no error). This is a critical issue.';
-          return NextResponse.json({
+           return NextResponse.json({
               message: `Order status updated to '${newOrderStatus}', but FAILED to confirm assignment record creation. Please check server logs.`,
               error: assignmentLogError
           }, { status: 500 });
+      } else {
+        assignmentLoggedSuccessfully = true;
       }
 
       // Attempt to update partner load (auxiliary task)
@@ -144,10 +140,12 @@ export async function PUT(request: Request, context: { params: Params }) {
         if (assignmentLoggedSuccessfully) {
             successMessage += ` Assignment logged successfully.`;
         }
-        if (partnerLoadUpdateMessage) { // Append warning if partner load update had issues
+        // If there was a partner load update message (even a warning), append it.
+        if (partnerLoadUpdateMessage) {
             successMessage += ` ${partnerLoadUpdateMessage}`;
         }
     }
+
 
     return NextResponse.json({
       message: successMessage,
