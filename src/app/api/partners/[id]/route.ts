@@ -10,10 +10,8 @@ interface Params {
 // PUT /api/partners/[id]
 export async function PUT(request: Request, context: { params: Params }) {
   const { id } = context.params;
-  console.log(`[API PUT /api/partners/${id}] Received request to update partner.`);
   try {
     const body = await request.json();
-    console.log(`[API PUT /api/partners/${id}] Request body:`, body);
 
     const assignedAreasArray = body.assignedAreas ?
       (Array.isArray(body.assignedAreas) ? body.assignedAreas : body.assignedAreas.split(',').map((s: string) => s.trim()).filter(Boolean))
@@ -29,13 +27,13 @@ export async function PUT(request: Request, context: { params: Params }) {
     if (body.shiftEnd !== undefined) updateData.shift_end = body.shiftEnd;
     if (body.currentLoad !== undefined) updateData.current_load = body.currentLoad;
     if (body.rating !== undefined) updateData.rating = body.rating;
-    // completed_orders and cancelled_orders are updated via order status changes, not directly here.
+    if (body.completedOrders !== undefined) updateData.completed_orders = body.completedOrders;
+    if (body.cancelledOrders !== undefined) updateData.cancelled_orders = body.cancelledOrders;
+
 
     if (Object.keys(updateData).length === 0) {
-      console.log(`[API PUT /api/partners/${id}] No fields to update.`);
       return NextResponse.json({ message: 'No fields to update' }, { status: 400 });
     }
-    console.log(`[API PUT /api/partners/${id}] Update data for Supabase:`, updateData);
 
     const { data, error } = await supabase
       .from('delivery_partners')
@@ -45,18 +43,16 @@ export async function PUT(request: Request, context: { params: Params }) {
       .single();
 
     if (error) {
-      console.error(`[API PUT /api/partners/${id}] Supabase error:`, error);
-      if (error.code === 'PGRST116') { // Partner not found by Supabase
+      console.error(`[API PUT /api/partners/${id}] Supabase error updating partner:`, { code: error.code, message: error.message, details: error.details });
+      if (error.code === 'PGRST116') { 
         return NextResponse.json({ message: `Partner with ID ${id} not found.`, error: error.message }, { status: 404 });
       }
-      return NextResponse.json({ message: `Error updating partner with ID ${id}. Supabase error: ${error.message}`, error: error.message }, { status: 500 });
+      return NextResponse.json({ message: `Error updating partner with ID ${id}.`, error: error.message }, { status: 500 });
     }
 
-    if (!data) { // Should be caught by .single() if not found, but as a fallback
-      console.error(`[API PUT /api/partners/${id}] No data returned from Supabase after update, though no error was thrown by Supabase. Partner ID: ${id}`);
+    if (!data) { 
       return NextResponse.json({ message: `Partner with ID ${id} not found after update, or no data returned.` }, { status: 404 });
     }
-    console.log(`[API PUT /api/partners/${id}] Successfully updated partner. Returning data:`, data);
 
     const updatedPartner: Partner = {
       id: data.id,
@@ -102,22 +98,18 @@ export async function DELETE(request: Request, context: { params: Params }) {
     console.log(`[API DELETE /api/partners/${id}] Supabase delete result - Error:`, error, `Count:`, count);
 
     if (error) {
-      console.error(`[API DELETE /api/partners/${id}] Supabase error during delete:`, error);
+      console.error(`[API DELETE /api/partners/${id}] Supabase error during delete:`, { code: error.code, message: error.message, details: error.details });
       if (error.code === '23503') { // Foreign key violation
         const responseBody = {
-          message: `Failed to delete partner ${id.substring(0,8)}... because they are still referenced in other records (e.g., assigned orders). Please reassign or complete their orders first.`,
-          error: "Foreign key constraint violation: " + error.message,
-          details: String(error.details ?? ''),
-          code: error.code
+          message: `Cannot delete partner. This partner is still referenced by existing orders or assignments. Please reassign or resolve these first.`,
+          error: "Foreign key constraint violation." 
         };
         console.log(`[API DELETE /api/partners/${id}] Returning 409 Conflict:`, responseBody);
         return NextResponse.json(responseBody, { status: 409 });
       }
       const responseBody = {
-        message: `Failed to delete partner with ID ${id}. Supabase error occurred.`,
-        error: error.message,
-        details: String(error.details ?? ''),
-        code: error.code
+        message: `Failed to delete partner due to a database error.`,
+        error: `Supabase error code: ${error.code}`
       };
       console.log(`[API DELETE /api/partners/${id}] Returning 500 Internal Server Error:`, responseBody);
       return NextResponse.json(responseBody, { status: 500 });
@@ -126,16 +118,15 @@ export async function DELETE(request: Request, context: { params: Params }) {
     if (count === 0) {
       console.log(`[API DELETE /api/partners/${id}] Partner not found, count is 0.`);
       const responseBody = {
-        message: `Partner with ID ${id.substring(0,8)}... not found. No rows were deleted.`,
+        message: `Partner with ID ${id.substring(0,8)}... not found. No partner was deleted.`,
         error: "Partner not found"
       };
       console.log(`[API DELETE /api/partners/${id}] Returning 404 Not Found:`, responseBody);
       return NextResponse.json(responseBody, { status: 404 });
     }
     
-    // If count > 0 and no error
-    const successMessage = `Partner ${id.substring(0,8)}... deleted successfully. ${count} row(s) affected.`;
-    console.log(`[API DELETE /api/partners/${id}] ${successMessage}. Returning 200 OK.`);
+    const successMessage = `Partner ${id.substring(0,8)}... deleted successfully.`;
+    console.log(`[API DELETE /api/partners/${id}] ${successMessage}. Affected rows: ${count}. Returning 200 OK.`);
     return NextResponse.json({ message: successMessage }, { status: 200 });
 
   } catch (e) {
