@@ -25,12 +25,10 @@ export default function PartnersPage() {
         let errorDetails = `Failed to fetch partners (status: ${response.status})`;
         try {
           const errorData = await response.json();
-          if (errorData.message && errorData.error) {
-            errorDetails = `${errorData.message} Details: ${errorData.error}`;
+          if (errorData.error) { // Prioritize Supabase specific error
+            errorDetails = `Failed to fetch partners: ${errorData.error}`;
           } else if (errorData.message) {
             errorDetails = errorData.message;
-          } else if (errorData.error) {
-            errorDetails = errorData.error;
           }
         } catch (parseError) {
           errorDetails = `Failed to fetch partners (status: ${response.status} ${response.statusText}). Could not parse error response.`;
@@ -70,7 +68,7 @@ export default function PartnersPage() {
   const handleDeletePartner = async (partnerId: string) => {
     const partnerToDelete = partners.find(p => p.id === partnerId);
     if (!partnerToDelete) {
-      toast({ title: "Error", description: "Partner not found.", variant: "destructive" });
+      toast({ title: "Error", description: "Partner not found for deletion.", variant: "destructive" });
       return;
     }
 
@@ -79,10 +77,13 @@ export default function PartnersPage() {
         const response = await fetch(`/api/partners/${partnerId}`, { method: 'DELETE' });
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.message || `Failed to delete partner ${partnerToDelete.name}`);
+          // Prioritize errorData.error (Supabase-specific detail) then errorData.message (API level message)
+          const detailedMessage = errorData.error || errorData.message || `Failed to delete partner ${partnerToDelete.name} (status: ${response.status} ${response.statusText})`;
+          throw new Error(detailedMessage);
         }
-        setPartners(prev => prev.filter(p => p.id !== partnerId));
-        toast({ title: "Partner Deleted", description: `Partner ${partnerToDelete.name} has been deleted.`, variant: "default" });
+        // On successful deletion, update the local state
+        setPartners(prevPartners => prevPartners.filter(p => p.id !== partnerId));
+        toast({ title: "Partner Deleted", description: `Partner ${partnerToDelete.name} has been successfully deleted.`, variant: "default" });
       } catch (error) {
         console.error("Error deleting partner:", error);
         toast({ title: "Deletion Failed", description: (error as Error).message, variant: "destructive" });

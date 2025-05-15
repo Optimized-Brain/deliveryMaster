@@ -43,15 +43,15 @@ export async function PUT(request: Request, context: { params: Params }) {
       .single();
 
     if (error) {
-      console.error(`Error updating partner ${id}:`, error);
-      if (error.code === 'PGRST116') {
-        return NextResponse.json({ message: `Partner with ID ${id} not found` }, { status: 404 });
+      console.error(`Error updating partner with ID ${id}:`, error);
+      if (error.code === 'PGRST116') { // PostgREST error for "Resource not found"
+        return NextResponse.json({ message: `Partner with ID ${id} not found.`, error: error.message }, { status: 404 });
       }
-      return NextResponse.json({ message: `Error updating partner ${id}`, error: error.message }, { status: 500 });
+      return NextResponse.json({ message: `Error updating partner with ID ${id}. Supabase error: ${error.message}`, error: error.message }, { status: 500 });
     }
 
     if (!data) {
-      return NextResponse.json({ message: `Partner with ID ${id} not found or no data returned` }, { status: 404 });
+      return NextResponse.json({ message: `Partner with ID ${id} not found after update, or no data returned.` }, { status: 404 });
     }
     
     const updatedPartner: Partner = {
@@ -71,9 +71,9 @@ export async function PUT(request: Request, context: { params: Params }) {
 
     return NextResponse.json({ message: `Partner ${id} updated successfully`, partner: updatedPartner });
   } catch (e) {
-    console.error('Error processing request:', e);
+    console.error(`Error processing PUT /api/partners/${id} request:`, e);
     const errorMessage = e instanceof Error ? e.message : 'Invalid request body or unexpected server error';
-    return NextResponse.json({ message: errorMessage, error: e instanceof Error ? e.message : String(e) }, { status: 400 });
+    return NextResponse.json({ message: errorMessage, error: e instanceof Error ? String(e) : 'Unknown error' }, { status: 400 });
   }
 }
 
@@ -81,15 +81,31 @@ export async function PUT(request: Request, context: { params: Params }) {
 export async function DELETE(request: Request, context: { params: Params }) {
   const { id } = context.params;
 
-  const { error } = await supabase
-    .from('delivery_partners')
-    .delete()
-    .eq('id', id);
+  try {
+    const { error } = await supabase
+      .from('delivery_partners')
+      .delete()
+      .eq('id', id);
 
-  if (error) {
-    console.error(`Error deleting partner ${id}:`, error);
-    return NextResponse.json({ message: `Error deleting partner ${id}`, error: error.message }, { status: 500 });
+    if (error) {
+      console.error(`Supabase error deleting partner with ID ${id}:`, error); // Detailed server log
+      // Provide a clear message about the Supabase error to the client
+      return NextResponse.json({ 
+        message: `Failed to delete partner with ID ${id}. Please check server logs.`, 
+        error: `Supabase error: ${error.message} (Code: ${error.code})` 
+      }, { status: 500 });
+    }
+
+    // Note: Supabase delete doesn't error if ID not found, it just deletes 0 rows.
+    // If you need to confirm a row was actually deleted, you could .select().single() before delete
+    // or check the 'count' property if it's returned and non-zero (depends on Supabase client version & settings).
+    // For simplicity, we assume success if no error.
+
+    return NextResponse.json({ message: `Partner ${id} deleted successfully` });
+  } catch (e) {
+    // Catch any unexpected errors during the process
+    console.error(`Unexpected error in DELETE /api/partners/${id}:`, e);
+    const errorMessage = e instanceof Error ? e.message : 'An unexpected server error occurred during deletion.';
+    return NextResponse.json({ message: "Server error during partner deletion.", error: errorMessage }, { status: 500 });
   }
-
-  return NextResponse.json({ message: `Partner ${id} deleted successfully` });
 }
