@@ -35,50 +35,61 @@ export default function OrdersPage() {
   const [isReportIssueDialogOpen, setIsReportIssueDialogOpen] = useState(false);
   const [orderForReportingIssue, setOrderForReportingIssue] = useState<string | null>(null);
 
-  // State for filters applied by OrderFilters component
   const [statusUiFilter, setStatusUiFilter] = useState<OrderStatus | "all">("all");
   const [areaUiFilter, setAreaUiFilter] = useState<string>("all");
   const [dateUiFilter, setDateUiFilter] = useState<Date | undefined>(undefined);
   
-  // State for filter applied by URL parameter
   const [urlPartnerFilterId, setUrlPartnerFilterId] = useState<string | null>(null);
 
   useEffect(() => {
     const partnerIdFromUrl = searchParams.get('assignedPartnerId');
+    console.log(`[OrdersPage Effect] Partner ID from URL: ${partnerIdFromUrl}`);
     setUrlPartnerFilterId(partnerIdFromUrl);
   }, [searchParams]);
 
 
   const fetchOrders = useCallback(async () => {
+    console.log('[OrdersPage Fetch] Starting fetchOrders...');
     setIsLoading(true);
     try {
       const response = await fetch('/api/orders');
+      console.log(`[OrdersPage Fetch] API response status: ${response.status}`);
+      const responseText = await response.text(); // Get raw text first to avoid parsing errors with non-JSON
+      console.log('[OrdersPage Fetch] API raw response text:', responseText.substring(0, 500) + (responseText.length > 500 ? '...' : ''));
+
+
       if (!response.ok) {
         let errorMessage = `Failed to fetch orders (status: ${response.status})`;
         try {
-          const errorText = await response.text();
-          if (errorText.startsWith("<!DOCTYPE html>")) {
-            errorMessage = `Failed to fetch orders. Server returned an HTML error page (status: ${response.status}). Check server logs.`;
-          } else {
-             const errorData = JSON.parse(errorText);
+          // Attempt to parse error if API is supposed to return JSON error
+          if (responseText.startsWith('{') || responseText.startsWith('[')) { // Basic check for JSON
+             const errorData = JSON.parse(responseText);
              errorMessage = errorData.error || errorData.message || errorMessage;
+          } else if (responseText.startsWith("<!DOCTYPE html>")) { // Check for HTML error page
+            errorMessage = `Failed to fetch orders. Server returned an HTML error page (status: ${response.status}). Check server logs.`;
           }
+          // If not JSON or HTML, use the raw text or a generic message
         } catch (jsonParseError) {
-          errorMessage = `Failed to fetch orders. Server returned a non-JSON response (status: ${response.status}). Check server logs for the underlying error (e.g., environment variables).`;
+           // This means response.ok was false, but the body wasn't valid JSON error
+           console.error('[OrdersPage Fetch] Failed to parse error JSON from API:', jsonParseError);
+           errorMessage = `Failed to fetch orders. Server returned a non-JSON error response (status: ${response.status}). Check server logs.`;
         }
+        console.error('[OrdersPage Fetch] Throwing error:', errorMessage);
         throw new Error(errorMessage);
       }
-      const data: Order[] = await response.json();
+      const data: Order[] = JSON.parse(responseText); // Now parse the successful response
+      console.log(`[OrdersPage Fetch] Successfully parsed ${data ? data.length : '0'} orders.`);
       setAllOrders(data);
     } catch (error) {
-      console.error("Error fetching orders:", error);
+      console.error("[OrdersPage Fetch] Error caught in fetchOrders:", error);
       toast({
         title: "Error Loading Orders",
         description: (error as Error).message,
         variant: "destructive",
       });
-      setAllOrders([]); // Ensure allOrders is empty on error
+      setAllOrders([]);
     } finally {
+      console.log('[OrdersPage Fetch] Finished fetchOrders, setIsLoading(false).');
       setIsLoading(false);
     }
   }, [toast]);
@@ -87,8 +98,8 @@ export default function OrdersPage() {
     fetchOrders();
   }, [fetchOrders]);
 
-  // Effect to apply all filters (URL param + UI filters)
   useEffect(() => {
+    console.log('[OrdersPage Effect] Filtering orders. All orders count:', allOrders.length, 'URL Partner Filter:', urlPartnerFilterId, 'UI Status:', statusUiFilter, 'UI Area:', areaUiFilter, 'UI Date:', dateUiFilter);
     let tempOrders = allOrders;
 
     if (urlPartnerFilterId) {
@@ -113,11 +124,13 @@ export default function OrdersPage() {
         new Date(order.creationDate).toDateString() === dateUiFilter.toDateString()
       );
     }
+    console.log(`[OrdersPage Effect] Filtered orders count: ${tempOrders.length}`);
     setFilteredOrders(tempOrders);
   }, [allOrders, urlPartnerFilterId, statusUiFilter, areaUiFilter, dateUiFilter, toast]);
 
 
   const handleFilterChange = (filters: { status?: OrderStatus | "all"; area?: string | "all"; date?: Date }) => {
+    console.log('[OrdersPage Action] handleFilterChange:', filters);
     if (urlPartnerFilterId) {
         setUrlPartnerFilterId(null); 
         router.replace('/orders', { scroll: false }); 
@@ -133,6 +146,7 @@ export default function OrdersPage() {
   };
 
   const handleClearFilters = () => {
+    console.log('[OrdersPage Action] handleClearFilters');
     setStatusUiFilter("all");
     setAreaUiFilter("all");
     setDateUiFilter(undefined);
