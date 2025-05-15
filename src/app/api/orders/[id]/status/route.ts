@@ -9,7 +9,7 @@ interface Params {
 
 // PUT /api/orders/[id]/status
 export async function PUT(request: Request, context: { params: Params }) {
-  const { id: orderId } = context.params; // Renamed for clarity
+  const { id: orderId } = context.params;
   console.log(`PUT /api/orders/${orderId}/status: Received request for order ID: ${orderId}`);
 
   try {
@@ -62,14 +62,11 @@ export async function PUT(request: Request, context: { params: Params }) {
 
     console.log(`PUT /api/orders/${orderId}/status: Order ${orderId} updated successfully to status ${status}.`);
 
-    // If order is assigned, update partner load and create assignment record
+    // If order is assigned, update partner load and create a base assignment record
     if (status === 'assigned' && assignedPartnerId) {
       console.log(`PUT /api/orders/${orderId}/status: Order assigned to partner ${assignedPartnerId}. Processing partner load and assignment log.`);
 
-      let partnerLoadUpdatedSuccessfully = false;
-      let partnerLoadFailureReason: string | undefined = undefined;
-
-      // 1. Increment Partner Load
+      // 1. Attempt to Increment Partner Load
       try {
         const { data: partnerData, error: partnerFetchError } = await supabase
           .from('delivery_partners')
@@ -80,7 +77,7 @@ export async function PUT(request: Request, context: { params: Params }) {
         if (partnerFetchError || !partnerData) {
           const errorMsg = `Failed to fetch partner ${assignedPartnerId} for load update: ${partnerFetchError?.message || 'Partner not found.'}`;
           console.error(`PUT /api/orders/${orderId}/status: ${errorMsg}`);
-          partnerLoadFailureReason = errorMsg;
+          // Continue to log assignment even if partner load update fails, but log this issue.
         } else {
           const newLoad = (partnerData.current_load || 0) + 1;
           const { error: partnerUpdateError } = await supabase
@@ -91,40 +88,37 @@ export async function PUT(request: Request, context: { params: Params }) {
           if (partnerUpdateError) {
             const errorMsg = `Error updating partner ${assignedPartnerId} load: ${partnerUpdateError.message}`;
             console.error(`PUT /api/orders/${orderId}/status: ${errorMsg}`);
-            partnerLoadFailureReason = errorMsg;
           } else {
             console.log(`PUT /api/orders/${orderId}/status: Partner ${assignedPartnerId} load updated to ${newLoad}.`);
-            partnerLoadUpdatedSuccessfully = true;
           }
         }
       } catch (e) {
           const errorMsg = `Unexpected error during partner load update for partner ${assignedPartnerId}: ${(e as Error).message}`;
           console.error(`PUT /api/orders/${orderId}/status: ${errorMsg}`);
-          partnerLoadFailureReason = errorMsg;
       }
 
-      // 2. Create Assignment Record (Log the attempt's outcome regarding partner load)
+      // 2. Create Base Assignment Record
+      // 'status' and 'reason' in the 'assignments' table are for admin input regarding delivery/pickup outcome.
+      // They are not set by the system during initial assignment.
       try {
         const assignmentLogData = {
           order_id: orderId,
           partner_id: assignedPartnerId,
-          timestamp: new Date().toISOString(), // Assumes 'timestamp' column in 'assignments' table
-          status: partnerLoadUpdatedSuccessfully ? 'success' : 'failed',
-          reason: partnerLoadFailureReason, // Will be undefined if partnerLoadUpdatedSuccessfully is true
+          // timestamp is likely set by database default 'now()'
         };
         const { error: assignmentInsertError } = await supabase
           .from('assignments')
-          .insert(assignmentLogData);
+          .insert(assignmentLogData)
+          .select(); // Add select if you need the created record's ID, e.g.
 
         if (assignmentInsertError) {
-          console.error(`PUT /api/orders/${orderId}/status: Error creating assignment record:`, assignmentInsertError);
+          console.error(`PUT /api/orders/${orderId}/status: Error creating base assignment record:`, assignmentInsertError);
           // This is a failure to log, but the primary order assignment might have succeeded.
-          // Client response will primarily reflect the order update status.
         } else {
-          console.log(`PUT /api/orders/${orderId}/status: Assignment record created for order ${orderId}, partner ${assignedPartnerId} with status: ${assignmentLogData.status}. Reason: ${assignmentLogData.reason || 'N/A'}`);
+          console.log(`PUT /api/orders/${orderId}/status: Base assignment record created for order ${orderId}, partner ${assignedPartnerId}.`);
         }
       } catch (e) {
-        console.error(`PUT /api/orders/${orderId}/status: Unexpected error during assignment record creation for order ${orderId}:`, e);
+        console.error(`PUT /api/orders/${orderId}/status: Unexpected error during base assignment record creation for order ${orderId}:`, e);
       }
     }
 
@@ -151,10 +145,8 @@ export async function PUT(request: Request, context: { params: Params }) {
     const errorInstance = e as Error;
     let errorMessage = 'Unexpected server error during order update.';
      if (errorInstance instanceof SyntaxError && errorInstance.message.includes('JSON')) {
-        // Check if it's a JSON parsing error from request.json()
         return NextResponse.json({ message: 'Invalid request body: Malformed JSON.', error: errorInstance.message }, { status: 400 });
     }
-    // For other errors, return a generic 500
     return NextResponse.json({ message: errorMessage, error: errorInstance.message || String(e) }, { status: 500 });
   }
 }
