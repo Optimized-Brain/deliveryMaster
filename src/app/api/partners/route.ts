@@ -6,48 +6,61 @@ import { PARTNER_STATUSES } from '@/lib/constants';
 
 // GET /api/partners
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const statusFilter = searchParams.get('status') as PartnerStatus | null;
+  try {
+    const { searchParams } = new URL(request.url);
+    const statusFilter = searchParams.get('status') as PartnerStatus | null;
 
-  let query = supabase
-    .from('delivery_partners')
-    .select('*');
+    let query = supabase
+      .from('delivery_partners')
+      .select('*');
 
-  if (statusFilter) {
-    if (PARTNER_STATUSES.includes(statusFilter)) {
-      query = query.eq('status', statusFilter);
-    } else {
-      // Optional: return an error for invalid status, or just ignore
-      console.warn(`Invalid status filter received: ${statusFilter}. Fetching all partners.`);
-      // Or: return NextResponse.json({ message: `Invalid status filter: ${statusFilter}` }, { status: 400 });
+    if (statusFilter) {
+      if (PARTNER_STATUSES.includes(statusFilter)) {
+        query = query.eq('status', statusFilter);
+      } else {
+        console.warn(`Invalid status filter received: ${statusFilter}. Fetching all partners.`);
+        // Optionally, you could return a 400 error for an invalid status
+        // return NextResponse.json({ message: `Invalid status filter: ${statusFilter}` }, { status: 400 });
+      }
     }
+    
+    query = query.order('name', { ascending: true });
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching partners from Supabase:', error);
+      return NextResponse.json({ message: 'Error fetching partners', error: error.message, details: error.details }, { status: 500 });
+    }
+
+    if (!data) {
+      // This case might occur if RLS prevents access but doesn't throw an error,
+      // or if the table is empty and a filter results in no matches.
+      return NextResponse.json([]);
+    }
+
+    const partners: Partner[] = data.map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      email: p.email,
+      phone: p.phone,
+      status: p.status as PartnerStatus,
+      assignedAreas: p.areas || [], // maps 'areas' from DB to 'assignedAreas'
+      shiftStart: p.shift_start, 
+      shiftEnd: p.shift_end,     
+      currentLoad: p.current_load ?? 0, // Default to 0 if null
+      rating: p.rating ?? 0, // Default to 0 if null
+      avatarUrl: p.avatar_url,
+      registrationDate: p.created_at, 
+    }));
+
+    return NextResponse.json(partners);
+
+  } catch (e) {
+    console.error('Unexpected error in GET /api/partners:', e);
+    const errorMessage = e instanceof Error ? e.message : 'An unexpected server error occurred.';
+    return NextResponse.json({ message: 'Failed to fetch partners due to server error', error: errorMessage }, { status: 500 });
   }
-  
-  query = query.order('name', { ascending: true });
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.error('Error fetching partners:', error);
-    return NextResponse.json({ message: 'Error fetching partners', error: error.message }, { status: 500 });
-  }
-
-  const partners: Partner[] = data.map((p: any) => ({
-    id: p.id,
-    name: p.name,
-    email: p.email,
-    phone: p.phone,
-    status: p.status as PartnerStatus,
-    assignedAreas: p.areas || [], // maps 'areas' from DB to 'assignedAreas'
-    shiftStart: p.shift_start, // maps 'shift_start' from DB
-    shiftEnd: p.shift_end,     // maps 'shift_end' from DB
-    currentLoad: p.current_load,
-    rating: p.rating,
-    avatarUrl: p.avatar_url,
-    registrationDate: p.created_at, // Mapped from created_at
-  }));
-
-  return NextResponse.json(partners);
 }
 
 // POST /api/partners
@@ -55,12 +68,13 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    // Validate body (basic example, use Zod for robust validation on API routes if needed)
     if (!body.name || !body.email || !body.phone || !body.shiftStart || !body.shiftEnd) {
-      return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
+      return NextResponse.json({ message: 'Missing required fields (name, email, phone, shiftStart, shiftEnd)' }, { status: 400 });
     }
     
-    const assignedAreasArray = body.assignedAreas ? body.assignedAreas.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
+    const assignedAreasArray = body.assignedAreas ? 
+        (Array.isArray(body.assignedAreas) ? body.assignedAreas : body.assignedAreas.split(',').map((s: string) => s.trim()).filter(Boolean)) 
+        : [];
 
     const newPartnerData = {
       name: body.name,
@@ -70,10 +84,10 @@ export async function POST(request: Request) {
       areas: assignedAreasArray, 
       shift_start: body.shiftStart, 
       shift_end: body.shiftEnd,     
-      current_load: body.currentLoad || 0,
-      rating: body.rating || 0,
+      current_load: body.currentLoad ?? 0,
+      rating: body.rating ?? 0,
       avatar_url: body.avatarUrl,
-      // created_at and updated_at are handled by Supabase
+      // created_at and updated_at are typically handled by Supabase defaults/triggers
     };
 
     const { data, error } = await supabase
@@ -83,14 +97,13 @@ export async function POST(request: Request) {
       .single(); 
 
     if (error) {
-      console.error('Error creating partner:', error);
-      // Return the Supabase error message for better client-side diagnostics
-      return NextResponse.json({ message: 'Error creating partner', error: error.message }, { status: 500 });
+      console.error('Error creating partner in Supabase:', error);
+      return NextResponse.json({ message: 'Error creating partner', error: error.message, details: error.details }, { status: 500 });
     }
     
     if (!data) {
-      console.error('Failed to create partner, no data returned after insert.');
-      return NextResponse.json({ message: 'Failed to create partner, no data returned. RLS issue?' }, { status: 500 });
+      console.error('Failed to create partner, no data returned after insert from Supabase.');
+      return NextResponse.json({ message: 'Failed to create partner, no data returned. Possible RLS issue or misconfiguration.' }, { status: 500 });
     }
 
     const createdPartner: Partner = {
@@ -102,17 +115,16 @@ export async function POST(request: Request) {
       assignedAreas: data.areas || [],
       shiftStart: data.shift_start,
       shiftEnd: data.shift_end,
-      currentLoad: data.current_load,
-      rating: data.rating,
+      currentLoad: data.current_load ?? 0,
+      rating: data.rating ?? 0,
       avatarUrl: data.avatar_url,
       registrationDate: data.created_at,
     };
 
     return NextResponse.json({ message: 'Partner created successfully', partner: createdPartner }, { status: 201 });
   } catch (e) {
-    console.error('Error processing POST /api/partners request:', e);
-    const errorMessage = e instanceof Error ? e.message : String(e);
-    // Ensure the error from this catch block also gets to the client if it's not a Supabase error from the .insert()
-    return NextResponse.json({ message: 'Invalid request body or unexpected server error', error: errorMessage }, { status: 400 });
+    console.error('Unexpected error in POST /api/partners:', e);
+    const errorMessage = e instanceof Error ? e.message : 'Invalid request body or unexpected server error';
+    return NextResponse.json({ message: 'Failed to create partner due to server error', error: errorMessage }, { status: 400 });
   }
 }
