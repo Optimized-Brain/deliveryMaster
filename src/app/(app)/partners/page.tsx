@@ -71,9 +71,10 @@ export default function PartnersPage() {
     }
   };
 
- const handleDeletePartner = async (partnerId: string) => {
+  const handleDeletePartner = async (partnerId: string) => {
     console.log(`[PartnersPage] handleDeletePartner: Entered for ID: ${partnerId}`);
     const partnerToDelete = partners.find(p => p.id === partnerId);
+
     if (!partnerToDelete) {
       toast({ title: "Error", description: "Partner not found for deletion in local state.", variant: "destructive" });
       console.error(`[PartnersPage] handleDeletePartner: Partner with ID ${partnerId} not found in local state.`);
@@ -87,48 +88,34 @@ export default function PartnersPage() {
         console.log(`[PartnersPage] handleDeletePartner: API response status: ${response.status}, statusText: ${response.statusText}`);
 
         let result;
-        const responseText = await response.text(); // Get raw text first
+        const responseText = await response.text();
         console.log(`[PartnersPage] handleDeletePartner: API response raw text: "${responseText}"`);
 
         try {
-          result = JSON.parse(responseText); // Attempt to parse JSON
+          result = JSON.parse(responseText);
           console.log(`[PartnersPage] handleDeletePartner: API response parsed JSON:`, result);
         } catch (e) {
           // If parsing fails, means response was not JSON (e.g. empty, or HTML error not caught by !response.ok)
-          if (response.ok && responseText.trim() === "") { 
-             console.warn(`[PartnersPage] handleDeletePartner: API response was OK (${response.status}) but body was empty or not JSON. This might indicate an issue if JSON was expected.`);
-             // If API successfully deletes and returns 204 No Content, this path might be taken.
-             // Our API is designed to send JSON even on 200 success.
-             if (response.status === 200 || response.status === 204) { // Check for 200 or 204
-                 setPartners(prevPartners => prevPartners.filter(p => p.id !== partnerId));
-                 toast({ title: "Partner Deleted", description: `Partner ${partnerToDelete.name} may have been deleted (server sent empty success response). Refresh if not updated.`, variant: "default" });
-                 console.log(`[PartnersPage] handleDeletePartner: Partner ${partnerId} removed from UI based on empty success response.`);
-                 return;
-             }
+          if (response.ok && responseText.trim() === "" && (response.status === 200 || response.status === 204)) {
+             // Treat empty 200/204 as potential success if API behaves this way (though our API sends JSON)
+             console.warn(`[PartnersPage] handleDeletePartner: API response was OK (${response.status}) but body was empty or not JSON. Assuming success for UI update.`);
+             setPartners(prevPartners => prevPartners.filter(p => p.id !== partnerId));
+             toast({ title: "Partner Deleted", description: `Partner ${partnerToDelete.name} may have been deleted (server sent empty success response).`, variant: "default" });
+             return;
           }
-          // If not OK or not empty, then it's a problem to be thrown
           console.error(`[PartnersPage] handleDeletePartner: Failed to parse API response text as JSON. Status: ${response.status}. Body: ${responseText.substring(0, 100)}...`);
-          throw new Error(`Failed to parse API response. Status: ${response.status}.`);
+          throw new Error(`Deletion failed. Server responded with status ${response.status} and non-JSON content. Check server logs.`);
         }
         
-
-        if (!response.ok) {
-          // Prioritize API's error message from parsed JSON
-          const errorMessage = result.error || result.message || `Failed to delete partner. Status: ${response.status}`;
-          console.error(`[PartnersPage] handleDeletePartner: API error: ${errorMessage}`);
-          throw new Error(errorMessage);
-        }
-
-        // Explicitly check for status 200 and a success message as per API design
         if (response.status === 200 && result.message && result.message.toLowerCase().includes("deleted successfully")) {
             setPartners(prevPartners => prevPartners.filter(p => p.id !== partnerId));
             toast({ title: "Partner Deleted", description: result.message, variant: "default" });
             console.log(`[PartnersPage] handleDeletePartner: Partner ${partnerId} deleted successfully from UI based on API message.`);
         } else {
-            // If response.ok but not status 200 or message is not as expected
-            console.warn(`[PartnersPage] handleDeletePartner: API response was OK (${response.status}) but result.message was unexpected or missing:`, result);
-            // Don't update UI if success isn't definitively confirmed
-            throw new Error(result.message || `Deletion status uncertain: API responded with ${response.status} but success message was unclear.`);
+            // Use API's error message from parsed JSON if available
+            const errorMessage = result.error || result.message || `Failed to delete partner. Status: ${response.status}`;
+            console.error(`[PartnersPage] handleDeletePartner: API error or unexpected response: ${errorMessage}`);
+            throw new Error(errorMessage);
         }
 
       } catch (error) {
@@ -145,15 +132,14 @@ export default function PartnersPage() {
     }
   };
 
-
   const handlePartnerRegistered = () => {
-    fetchPartners();
+    fetchPartners(); // Refresh the list
     setEditingPartner(null);
     setActiveTab("list");
   };
 
   const handlePartnerUpdated = () => {
-    fetchPartners();
+    fetchPartners(); // Refresh the list
     setEditingPartner(null);
     setActiveTab("list");
     toast({title: "Partner Updated", description: "Partner details have been successfully updated."})
@@ -161,13 +147,13 @@ export default function PartnersPage() {
 
   const handleTabChange = (newTab: string) => {
     if (newTab === "list") {
-      setEditingPartner(null);
+      setEditingPartner(null); // Clear editing state if switching to list
     }
     setActiveTab(newTab);
   }
 
   const handleAddNewPartnerClick = () => {
-    setEditingPartner(null);
+    setEditingPartner(null); // Ensure form is for new partner
     setActiveTab("register");
   }
 
@@ -208,7 +194,7 @@ export default function PartnersPage() {
             partnerToEdit={editingPartner}
             onPartnerRegistered={handlePartnerRegistered}
             onPartnerUpdated={handlePartnerUpdated}
-            key={editingPartner ? editingPartner.id : 'register-new'}
+            key={editingPartner ? editingPartner.id : 'register-new'} // Re-mount form on edit
           />
         </TabsContent>
       </Tabs>

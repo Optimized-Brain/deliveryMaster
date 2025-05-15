@@ -83,7 +83,7 @@ export async function PUT(request: Request, context: { params: Params }) {
         errorMessage = e.message;
     }
     console.error(`[API PUT /api/partners/${id}] Catch block error:`, errorMessage, e);
-    return NextResponse.json({ message: 'Failed to update partner.', error: errorMessage }, { status: 500 }); // Changed to 500 for unexpected
+    return NextResponse.json({ message: 'Failed to update partner.', error: errorMessage }, { status: 500 });
   }
 }
 

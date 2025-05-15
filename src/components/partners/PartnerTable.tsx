@@ -39,7 +39,7 @@ function AssignedOrdersPopoverContent({
   }
 
   return (
-    <ScrollArea className="max-h-80 w-80 p-1"> {/* Adjusted width */}
+    <ScrollArea className="max-h-80 w-80 p-1">
       <div className="p-3 space-y-3">
         {activeOrders.length > 0 && (
           <div>
@@ -115,7 +115,7 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<PartnerStatus | 'all'>('all');
-  // const { toast } = useToast(); // Toast is handled by parent page
+  const { toast } = useToast(); 
 
   const [partnerOrderData, setPartnerOrderData] = useState<Record<string, {
     active: Order[];
@@ -130,10 +130,11 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
     console.log(`[PartnerTable] fetchOrdersForPartner: Fetching for partner ID ${partnerId} (${partnerName})`);
     setPartnerOrderData(prev => ({
       ...prev,
-      [partnerId]: { ...(prev[partnerId] || { active: [], delivered: [], cancelled: [] }), isLoading: true, error: null }
+      [partnerId]: { active: [], delivered: [], cancelled: [], isLoading: true, error: null }
     }));
     try {
       const response = await fetch(`/api/orders?assignedPartnerId=${partnerId}`);
+      console.log(`[PartnerTable] fetchOrdersForPartner: API response status for ${partnerId}: ${response.status}`);
       if (!response.ok) {
         let message = `Failed to fetch orders for partner ${partnerName} (status: ${response.status})`;
         try {
@@ -160,24 +161,27 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
       console.error(`[PartnerTable] fetchOrdersForPartner: Error fetching orders for partner ${partnerId}:`, errorMessage);
       setPartnerOrderData(prev => ({
         ...prev,
-        [partnerId]: { ...(prev[partnerId] || { active: [], delivered: [], cancelled: [] }), isLoading: false, error: errorMessage }
+        [partnerId]: { active: [], delivered: [], cancelled: [], isLoading: false, error: errorMessage }
       }));
-      // Error is displayed in cell, no global toast needed here
+       toast({ // Show toast for individual partner fetch failure
+        title: `Order Fetch Failed for ${partnerName}`,
+        description: errorMessage,
+        variant: "destructive"
+      });
     }
-  }, []); // Removed toast from dependencies as it's not used directly
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toast]); 
 
   useEffect(() => {
     console.log("[PartnerTable] useEffect: Partners prop changed or component mounted. Processing partners:", partners.length);
     partners.forEach(partner => {
-      // Fetch if not present, or if previous fetch errored, or if data might be stale (e.g. after some time)
-      // For simplicity, just fetching if not present or errored for now.
+      // Fetch if not present, or if previous fetch errored
       if (!partnerOrderData[partner.id] || partnerOrderData[partner.id]?.error) {
         console.log(`[PartnerTable] useEffect: Triggering fetch for partner ${partner.id}`);
         fetchOrdersForPartner(partner.id, partner.name);
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [partners, fetchOrdersForPartner]); // fetchOrdersForPartner is stable
+  }, [partners, fetchOrdersForPartner, partnerOrderData]); // Added partnerOrderData to ensure re-fetch if an error occurred
 
   const filteredAndSortedPartners = useMemo(() => {
     let processedPartners = [...partners];
@@ -279,7 +283,7 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                 <TableHead onClick={() => handleSort('status')} className="cursor-pointer hover:bg-muted/50">Status {renderSortIcon('status')}</TableHead>
                 <TableHead>Areas</TableHead>
                 <TableHead onClick={() => handleSort('currentLoad')} className="cursor-pointer hover:bg-muted/50 text-center whitespace-nowrap">Current Load {renderSortIcon('currentLoad')}</TableHead>
-                <TableHead className="text-center">Partner Orders Summary</TableHead>
+                <TableHead className="text-center min-w-[200px]">Partner Orders Summary</TableHead>
                 <TableHead onClick={() => handleSort('rating')} className="cursor-pointer hover:bg-muted/50 text-center">Rating {renderSortIcon('rating')}</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -292,7 +296,9 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                 const activeCount = ordersInfo?.active?.length || 0;
                 // Use partner.completedOrders and partner.cancelledOrders from the main partner object
                 // which are updated via API when order statuses change.
-                // The counts from fetched orders in popover are for detailed breakdown.
+                const completedCount = partner.completedOrders;
+                const cancelledCount = partner.cancelledOrders;
+
 
                 return (
                   <TableRow key={partner.id}>
@@ -314,19 +320,19 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                       {partner.assignedAreas.join(', ')}
                     </TableCell>
                     <TableCell className="text-center">{partner.currentLoad}</TableCell>
-                    <TableCell className="text-xs align-top pt-3 min-w-[180px]"> {/* Adjusted min-width */}
-                        {isLoadingPartnerOrders && (!ordersInfo || (!ordersInfo.active && !ordersInfo.delivered && !ordersInfo.cancelled)) ? ( // Show loader only if no data at all yet
+                    <TableCell className="text-xs align-top pt-3">
+                        {isLoadingPartnerOrders && !ordersInfo?.active && !ordersInfo?.delivered && !ordersInfo?.cancelled ? ( 
                              <div className="flex items-center justify-center">
                                 <Loader2 className="h-4 w-4 animate-spin" />
-                                <span className="ml-1">Loading...</span>
+                                <span className="ml-1">Loading orders...</span>
                              </div>
-                        ) : partnerOrderError ? (
+                        ) : partnerOrderError && !ordersInfo?.active && !ordersInfo?.delivered && !ordersInfo?.cancelled ? (
                             <div className="text-destructive text-center" title={partnerOrderError}>Error!</div>
                         ) : (
                             <div className="space-y-0.5 text-center">
                                 <p>Active: <span className="font-semibold">{activeCount}</span></p>
-                                <p>Completed: <span className="font-semibold">{partner.completedOrders}</span></p>
-                                <p>Cancelled: <span className="font-semibold">{partner.cancelledOrders}</span></p>
+                                <p>Completed: <span className="font-semibold">{completedCount}</span></p>
+                                <p>Cancelled: <span className="font-semibold">{cancelledCount}</span></p>
                                 <Popover>
                                 <PopoverTrigger asChild>
                                     <Button variant="link" size="sm" className="p-0 h-auto text-xs mt-1">
@@ -335,7 +341,7 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                                 </PopoverTrigger>
                                 <PopoverContent
                                     className="w-auto p-0"
-                                    onOpenAutoFocus={(e) => e.preventDefault()} // Prevent focus trap issues if any
+                                    onOpenAutoFocus={(e) => e.preventDefault()} 
                                     align="center"
                                     side="bottom"
                                 >
@@ -390,4 +396,3 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
     </div>
   );
 }
-
