@@ -34,7 +34,8 @@ export const SAMPLE_ORDERS: Order[] = [
     customerName: 'Rajesh Kumar',
     customerPhone: '+91 99887 76655',
     items: [{ name: 'Hyderabadi Biryani', quantity: 2 }],
-    status: 'pending',
+    status: 'delivered', // Changed for testing
+    assignedPartnerId: DUMMY_PARTNER_UUID_1,
     area: 'Bandra',
     creationDate: "2024-05-15T11:00:00.000Z",
     deliveryAddress: '456, Linking Road, Bandra West, Mumbai, 400050',
@@ -56,9 +57,10 @@ export const SAMPLE_ORDERS: Order[] = [
     customerName: 'Vikram Patel',
     customerPhone: '+91 92345 67890',
     items: [{ name: 'Masala Dosa', quantity: 2 }, { name: 'Filter Coffee', quantity: 2 }],
-    status: 'pending',
+    status: 'delivered', // Changed for testing
+    assignedPartnerId: DUMMY_PARTNER_UUID_2,
     area: 'T. Nagar',
-    creationDate: "2024-05-14T16:45:00.000Z",
+    creationDate: "2023-04-14T16:45:00.000Z", // Older date for 30-day testing
     deliveryAddress: '101, Usman Road, T. Nagar, Chennai, 600017',
     orderValue: 350.00,
   },
@@ -133,6 +135,18 @@ export const SAMPLE_ORDERS: Order[] = [
     deliveryAddress: '3rd Avenue, Anna Nagar, Chennai, 600040',
     orderValue: 420.00,
   },
+  {
+    id: 'd0c9e8b7-a65f-4e3d-2c1b-0a9f8e7d6c5b',
+    customerName: 'Kavita Nair',
+    customerPhone: '+91 87654 32109',
+    items: [{ name: 'Fish Curry', quantity: 1 }],
+    status: 'cancelled',
+    assignedPartnerId: DUMMY_PARTNER_UUID_3,
+    area: 'MG Road',
+    creationDate: "2024-05-10T15:00:00.000Z",
+    deliveryAddress: 'St. Marks Road, MG Road Area, Bangalore, 560001',
+    orderValue: 650.00,
+  },
 ];
 
 
@@ -150,12 +164,12 @@ export const DASHBOARD_METRICS_CONFIG: Omit<Metric, 'value' | 'change' | 'change
   },
   {
     id: 'metric-delivered-orders',
-    title: 'Delivered (Last 30d)',
+    title: 'Total Delivered Orders', // Updated Title
     icon: BarChart3,
   },
   {
     id: 'metric-avg-order-value',
-    title: 'Avg. Order Value', // Currency will be prefixed in DashboardPage.tsx
+    title: 'Avg. Order Value',
     icon: DollarSign,
   },
 ];

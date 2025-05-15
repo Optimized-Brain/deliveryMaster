@@ -42,10 +42,9 @@ export default function DashboardPage() {
       const totalOrders = fetchedOrders.length;
       const pendingOrdersCount = fetchedPendingOrders.length;
 
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const deliveredLast30Days = fetchedOrders.filter(
-        order => order.status === 'delivered' && new Date(order.creationDate) >= thirtyDaysAgo
+      // Updated to count all delivered orders (no time restriction)
+      const totalDeliveredOrders = fetchedOrders.filter(
+        order => order.status === 'delivered'
       ).length;
 
       const totalValue = fetchedOrders.reduce((sum, order) => sum + (Number(order.orderValue) || 0), 0);
@@ -54,8 +53,9 @@ export default function DashboardPage() {
       setMetrics(prevMetrics => prevMetrics.map(metric => {
         if (metric.id === 'metric-total-orders') return { ...metric, value: totalOrders };
         if (metric.id === 'metric-pending-orders') return { ...metric, value: pendingOrdersCount };
-        if (metric.id === 'metric-delivered-orders') return { ...metric, value: deliveredLast30Days };
-        if (metric.id === 'metric-avg-order-value') return { ...metric, value: `₹${avgOrderValue.toFixed(2)}` }; // Changed to INR
+        // Updated metric ID and value
+        if (metric.id === 'metric-delivered-orders') return { ...metric, title: "Total Delivered Orders", value: totalDeliveredOrders }; 
+        if (metric.id === 'metric-avg-order-value') return { ...metric, value: `₹${avgOrderValue.toFixed(2)}` };
         return { ...metric, value: "N/A" }; 
       }));
 
