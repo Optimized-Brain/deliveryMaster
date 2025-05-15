@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Send } from "lucide-react";
+import { Loader2, Wand2, Send, CheckCircle } from "lucide-react"; // Added Wand2, CheckCircle
 import { useToast } from '@/hooks/use-toast';
 import { assignOrder, type AssignOrderInput, type AssignOrderOutput } from "@/ai/flows/smart-order-assignment";
 import { AssignmentResultCard } from './AssignmentResultCard';
@@ -28,9 +28,13 @@ export function SmartAssignmentForm() {
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isLoading, setIsLoading] = useState(false);
+
+  const [isFetchingSuggestion, setIsFetchingSuggestion] = useState(false);
+  const [isConfirmingAssignment, setIsConfirmingAssignment] = useState(false);
   const [isDataLoading, setIsDataLoading] = useState(true);
-  const [assignmentResult, setAssignmentResult] = useState<AssignOrderOutput | null>(null);
+  
+  const [aiSuggestion, setAiSuggestion] = useState<AssignOrderOutput | null>(null);
+  const [selectedPartnerForAssignment, setSelectedPartnerForAssignment] = useState<string>('');
   
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
   const [availablePartners, setAvailablePartners] = useState<Partner[]>([]);
@@ -118,21 +122,21 @@ export function SmartAssignmentForm() {
     fetchData();
   }, [fetchData]);
 
-
-  const onSubmit = async (data: AssignmentFormData) => {
-    setIsLoading(true);
-    setAssignmentResult(null);
+  const handleGetAISuggestion = async (data: AssignmentFormData) => {
+    setIsFetchingSuggestion(true);
+    setAiSuggestion(null);
+    setSelectedPartnerForAssignment('');
 
     const selectedOrder = pendingOrders.find(o => o.id === data.orderId); 
     if (!selectedOrder) {
         toast({ title: "Error", description: "Selected order not found.", variant: "destructive"});
-        setIsLoading(false);
+        setIsFetchingSuggestion(false);
         return;
     }
 
     if (availablePartners.length === 0) {
-        toast({ title: "Error", description: "No available partners to assign the order to.", variant: "destructive"});
-        setIsLoading(false);
+        toast({ title: "Error", description: "No available partners to suggest from.", variant: "destructive"});
+        setIsFetchingSuggestion(false);
         return;
     }
     
@@ -150,46 +154,81 @@ export function SmartAssignmentForm() {
 
     try {
       const result = await assignOrder(input);
-      setAssignmentResult(result);
-      
-      const updateResponse = await fetch(`/api/orders/${data.orderId}/status`, {
+      setAiSuggestion(result);
+      setSelectedPartnerForAssignment(result.suggestedPartnerId); // Pre-select AI suggestion
+      toast({
+        title: "AI Suggestion Ready",
+        description: `AI suggests partner ${result.suggestedPartnerId}. Review and confirm.`,
+      });
+    } catch (error) {
+      console.error("AI suggestion failed:", error);
+      toast({
+        title: "AI Suggestion Failed",
+        description: (error as Error).message || "An unknown error occurred while getting AI suggestion.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFetchingSuggestion(false);
+    }
+  };
+
+  const handleConfirmAssignment = async () => {
+    const orderId = form.getValues('orderId');
+    if (!orderId || !selectedPartnerForAssignment) {
+      toast({
+        title: "Missing Information",
+        description: "Please select an order and a partner to assign.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsConfirmingAssignment(true);
+    try {
+      const updateResponse = await fetch(`/api/orders/${orderId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           status: 'assigned', 
-          assignedPartnerId: result.assignedPartnerId 
+          assignedPartnerId: selectedPartnerForAssignment 
         }),
       });
 
       if (!updateResponse.ok) {
-        let errorDetails = `Failed to update order ${data.orderId} status (API status: ${updateResponse.status}).`;
+        let errorDetails = `Failed to update order ${orderId} status (API status: ${updateResponse.status}).`;
         try {
             const errorData = await updateResponse.json();
             if (errorData && errorData.message) { 
                 errorDetails = errorData.message;
             }
         } catch (e) {
-             console.error(`Could not parse JSON response from PUT /api/orders/${data.orderId}/status:`, e);
+             console.error(`Could not parse JSON response from PUT /api/orders/${orderId}/status:`, e);
         }
         throw new Error(errorDetails);
       }
       
       toast({
-        title: "Assignment Successful",
-        description: `Order ${data.orderId} assigned to partner ${result.assignedPartnerId} and status updated.`,
+        title: "Order Assigned!",
+        description: `Order ${orderId} successfully assigned to partner ${selectedPartnerForAssignment}.`,
+        variant: "default"
       });
       
-      fetchData(); 
+      fetchData(); // Refresh orders and partners list
+      setAiSuggestion(null); // Reset suggestion
+      setSelectedPartnerForAssignment(''); // Reset selected partner
+      form.resetField('orderId'); // Reset order selection or navigate away
+      form.resetField('orderLocation');
+      // router.push('/orders'); // Optionally navigate away
 
     } catch (error) {
-      console.error("Smart assignment or order update failed:", error);
+      console.error("Order assignment confirmation failed:", error);
       toast({
-        title: "Assignment Process Failed",
-        description: (error as Error).message || "An unknown error occurred.",
+        title: "Assignment Failed",
+        description: (error as Error).message || "An unknown error occurred during assignment.",
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setIsConfirmingAssignment(false);
     }
   };
 
@@ -207,11 +246,11 @@ export function SmartAssignmentForm() {
       <Card className="w-full max-w-xl mx-auto shadow-lg">
         <CardHeader>
           <CardTitle>Smart Order Assignment</CardTitle>
-          <CardDescription>Use AI to find the best partner for an order.</CardDescription>
+          <CardDescription>Get an AI suggestion or manually assign an order to a partner.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(handleGetAISuggestion)} className="space-y-6">
               <FormField
                 control={form.control}
                 name="orderId"
@@ -225,9 +264,11 @@ export function SmartAssignmentForm() {
                         if (currentSelectedOrder) {
                           form.setValue("orderLocation", currentSelectedOrder.area); 
                         }
+                        setAiSuggestion(null); // Clear previous suggestion when order changes
+                        setSelectedPartnerForAssignment('');
                       }} 
                       value={field.value}
-                      disabled={isDataLoading}
+                      disabled={isDataLoading || isFetchingSuggestion || isConfirmingAssignment}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -255,9 +296,9 @@ export function SmartAssignmentForm() {
                 name="orderLocation"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Order Location</FormLabel>
+                    <FormLabel>Order Location (auto-filled from order)</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Downtown" {...field} disabled={isDataLoading} />
+                      <Input placeholder="e.g., Downtown" {...field} disabled />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -266,14 +307,14 @@ export function SmartAssignmentForm() {
               <Button 
                 type="submit" 
                 className="w-full" 
-                disabled={isLoading || isDataLoading || pendingOrders.length === 0 || availablePartners.length === 0}
+                disabled={isFetchingSuggestion || isDataLoading || pendingOrders.length === 0 || availablePartners.length === 0 || isConfirmingAssignment || !form.getValues('orderId')}
               >
-                {isLoading ? (
+                {isFetchingSuggestion ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
-                  <Send className="mr-2 h-4 w-4" />
+                  <Wand2 className="mr-2 h-4 w-4" /> 
                 )}
-                {isLoading ? "Assigning..." : "Assign Order with AI"}
+                {isFetchingSuggestion ? "Getting Suggestion..." : "Get AI Suggestion"}
               </Button>
               {pendingOrders.length === 0 && !isDataLoading && (
                  <p className="text-sm text-center text-muted-foreground">No pending orders available for assignment.</p>
@@ -286,9 +327,53 @@ export function SmartAssignmentForm() {
         </CardContent>
       </Card>
 
-      {assignmentResult && (
-        <div className="flex justify-center mt-8">
-           <AssignmentResultCard result={assignmentResult} />
+      {aiSuggestion && (
+        <div className="mt-8 space-y-6">
+          <div className="flex justify-center">
+           <AssignmentResultCard suggestion={aiSuggestion} />
+          </div>
+          
+          <Card className="w-full max-w-xl mx-auto shadow-lg">
+            <CardHeader>
+              <CardTitle>Confirm Assignment</CardTitle>
+              <CardDescription>Confirm the AI's suggestion or choose a different partner.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <FormItem>
+                <FormLabel>Assign to Partner</FormLabel>
+                <Select
+                  value={selectedPartnerForAssignment}
+                  onValueChange={setSelectedPartnerForAssignment}
+                  disabled={isConfirmingAssignment || availablePartners.length === 0}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a partner" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {availablePartners.map(partner => (
+                      <SelectItem key={partner.id} value={partner.id}>
+                        {partner.name} (ID: {partner.id}) - Load: {partner.currentLoad}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormItem>
+              <Button 
+                onClick={handleConfirmAssignment} 
+                className="w-full"
+                disabled={isConfirmingAssignment || !selectedPartnerForAssignment}
+              >
+                {isConfirmingAssignment ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                )}
+                {isConfirmingAssignment ? "Assigning..." : "Confirm & Assign Order"}
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>
