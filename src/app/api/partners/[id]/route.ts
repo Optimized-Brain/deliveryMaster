@@ -66,8 +66,13 @@ export async function PUT(request: Request, context: { params: Params }) {
 
     return NextResponse.json({ message: `Partner ${id} updated successfully`, partner: updatedPartner });
   } catch (e) {
-    const errorMessage = e instanceof Error ? e.message : 'Invalid request body or unexpected server error';
-    return NextResponse.json({ message: errorMessage, error: e instanceof Error ? String(e) : 'Unknown error' }, { status: 400 });
+    let errorMessage = 'Invalid request body or unexpected server error';
+    if (e instanceof SyntaxError && e.message.includes('JSON')) {
+        errorMessage = 'Invalid request body: Malformed JSON.';
+    } else if (e instanceof Error) {
+        errorMessage = e.message;
+    }
+    return NextResponse.json({ message: 'Failed to update partner.', error: errorMessage }, { status: 400 });
   }
 }
 
@@ -78,11 +83,10 @@ export async function DELETE(request: Request, context: { params: Params }) {
   try {
     const { error, count } = await supabase
       .from('delivery_partners')
-      .delete({ count: 'exact' }) // Request the count of deleted rows
+      .delete({ count: 'exact' }) 
       .eq('id', id);
 
     if (error) {
-      // This could be an RLS violation or other database error
       return NextResponse.json({ 
         message: `Failed to delete partner with ID ${id}. Please check server logs for details.`, 
         error: `Supabase error: ${error.message}`,
@@ -92,14 +96,12 @@ export async function DELETE(request: Request, context: { params: Params }) {
     }
 
     if (count === 0) {
-      // No rows were deleted, meaning the partner ID was not found
       return NextResponse.json({
         message: `Partner with ID ${id} not found. No rows were deleted.`,
         error: "Partner not found"
       }, { status: 404 });
     }
 
-    // If count > 0, deletion was successful
     return NextResponse.json({ message: `Partner ${id} deleted successfully. ${count} row(s) affected.` });
 
   } catch (e) {
