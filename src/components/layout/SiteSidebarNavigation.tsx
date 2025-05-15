@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -12,7 +13,7 @@ import {
 } from "@/components/ui/sidebar";
 import { APP_NAME, NAV_LINKS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { Package2, Settings } from "lucide-react"; // Using Package2 as a generic app icon
+import { Package2, Settings as SettingsIcon } from "lucide-react"; // Renamed Settings to SettingsIcon
 
 export function SiteSidebarNavigation() {
   const pathname = usePathname();
@@ -55,14 +56,15 @@ export function SiteSidebarNavigation() {
            <SidebarMenuItem>
              <SidebarMenuButton 
                 asChild
+                isActive={pathname === '/settings'} // Check for active settings page
                 tooltip={{ children: "Settings", className: "group-data-[collapsible=icon]:block hidden" }}
                 className={cn(
                   "justify-start",
                   {"group-data-[collapsible=icon]:justify-center": true}
                 )}
              >
-                <Link href="#">
-                  <Settings className="h-5 w-5" />
+                <Link href="/settings">
+                  <SettingsIcon className="h-5 w-5" />
                   <span className="group-data-[collapsible=icon]:hidden">Settings</span>
                 </Link>
              </SidebarMenuButton>

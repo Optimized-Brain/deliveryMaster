@@ -1,3 +1,4 @@
+
 "use client";
 
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -7,8 +8,17 @@ import { NAV_LINKS } from "@/lib/constants";
 
 export function SiteHeader() {
   const pathname = usePathname();
-  const currentLink = NAV_LINKS.find(link => pathname.startsWith(link.href));
-  const pageTitle = currentLink ? currentLink.label : APP_NAME;
+  // Check main NAV_LINKS
+  let currentLink = NAV_LINKS.find(link => pathname.startsWith(link.href));
+  
+  // If not found in main NAV_LINKS, check if it's the settings page
+  let pageTitle = currentLink ? currentLink.label : APP_NAME;
+  if (pathname === '/settings') {
+    pageTitle = "Settings";
+  } else if (!currentLink) { // Fallback if not in NAV_LINKS and not /settings
+    pageTitle = APP_NAME; // Or derive from pathname if more specific logic is needed
+  }
+
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
