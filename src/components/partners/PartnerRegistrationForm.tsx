@@ -26,7 +26,6 @@ const partnerSchema = z.object({
   shiftEnd: z.string().regex(timeRegex, "Invalid end time format (HH:MM)"),
   currentLoad: z.coerce.number().min(0, "Load cannot be negative").optional(),
   rating: z.coerce.number().min(0, "Rating cannot be negative").max(5, "Rating cannot exceed 5").optional(),
-  avatarUrl: z.string().url("Invalid URL format for avatar").optional().or(z.literal('')),
 }).refine(data => {
   if (data.shiftStart && data.shiftEnd) {
     return data.shiftEnd > data.shiftStart;
@@ -61,7 +60,6 @@ export function PartnerRegistrationForm({ partnerToEdit, onPartnerRegistered, on
       shiftEnd: "17:00",
       currentLoad: 0,
       rating: 0,
-      avatarUrl: "",
     },
   });
 
@@ -77,7 +75,6 @@ export function PartnerRegistrationForm({ partnerToEdit, onPartnerRegistered, on
         shiftEnd: partnerToEdit.shiftEnd,
         currentLoad: partnerToEdit.currentLoad,
         rating: partnerToEdit.rating,
-        avatarUrl: partnerToEdit.avatarUrl || "",
       });
     } else {
       form.reset({ // Reset to default values for registration mode
@@ -90,7 +87,6 @@ export function PartnerRegistrationForm({ partnerToEdit, onPartnerRegistered, on
         shiftEnd: "17:00",
         currentLoad: 0,
         rating: 0,
-        avatarUrl: "",
       });
     }
   }, [isEditMode, partnerToEdit, form]);
@@ -278,19 +274,6 @@ export function PartnerRegistrationForm({ partnerToEdit, onPartnerRegistered, on
                     )}
                     />
             </div>
-            <FormField
-                control={form.control}
-                name="avatarUrl"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Avatar URL (Optional)</FormLabel>
-                    <FormControl>
-                        <Input type="url" placeholder="https://example.com/avatar.png" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-            />
             <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting 
                 ? (isEditMode ? 'Updating...' : 'Registering...') 
@@ -302,4 +285,3 @@ export function PartnerRegistrationForm({ partnerToEdit, onPartnerRegistered, on
     </Card>
   );
 }
-

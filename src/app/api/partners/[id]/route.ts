@@ -27,7 +27,6 @@ export async function PUT(request: Request, context: { params: Params }) {
     if (body.shiftEnd !== undefined) updateData.shift_end = body.shiftEnd;       
     if (body.currentLoad !== undefined) updateData.current_load = body.currentLoad;
     if (body.rating !== undefined) updateData.rating = body.rating;
-    if (body.avatarUrl !== undefined) updateData.avatar_url = body.avatarUrl;
     // created_at should not be updated
     // updated_at is handled by Supabase
 
@@ -39,7 +38,7 @@ export async function PUT(request: Request, context: { params: Params }) {
       .from('delivery_partners')
       .update(updateData)
       .eq('id', id)
-      .select()
+      .select('id, name, email, phone, status, areas, shift_start, shift_end, current_load, rating, created_at')
       .single();
 
     if (error) {
@@ -65,7 +64,6 @@ export async function PUT(request: Request, context: { params: Params }) {
       shiftEnd: data.shift_end,
       currentLoad: data.current_load,
       rating: data.rating,
-      avatarUrl: data.avatar_url,
       registrationDate: data.created_at,
     };
 
@@ -80,6 +78,7 @@ export async function PUT(request: Request, context: { params: Params }) {
 // DELETE /api/partners/[id]
 export async function DELETE(request: Request, context: { params: Params }) {
   const { id } = context.params;
+  console.log(`DELETE /api/partners/${id}: Received request for partner ID: ${id}`);
 
   try {
     const { error } = await supabase
@@ -88,22 +87,15 @@ export async function DELETE(request: Request, context: { params: Params }) {
       .eq('id', id);
 
     if (error) {
-      console.error(`Supabase error deleting partner with ID ${id}:`, error); // Detailed server log
-      // Provide a clear message about the Supabase error to the client
+      console.error(`Supabase error deleting partner with ID ${id}:`, error); 
       return NextResponse.json({ 
         message: `Failed to delete partner with ID ${id}. Please check server logs.`, 
         error: `Supabase error: ${error.message} (Code: ${error.code})` 
       }, { status: 500 });
     }
-
-    // Note: Supabase delete doesn't error if ID not found, it just deletes 0 rows.
-    // If you need to confirm a row was actually deleted, you could .select().single() before delete
-    // or check the 'count' property if it's returned and non-zero (depends on Supabase client version & settings).
-    // For simplicity, we assume success if no error.
-
+    console.log(`DELETE /api/partners/${id}: Partner deleted successfully from Supabase.`);
     return NextResponse.json({ message: `Partner ${id} deleted successfully` });
   } catch (e) {
-    // Catch any unexpected errors during the process
     console.error(`Unexpected error in DELETE /api/partners/${id}:`, e);
     const errorMessage = e instanceof Error ? e.message : 'An unexpected server error occurred during deletion.';
     return NextResponse.json({ message: "Server error during partner deletion.", error: errorMessage }, { status: 500 });

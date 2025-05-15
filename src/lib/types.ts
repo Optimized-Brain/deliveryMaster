@@ -21,7 +21,6 @@ export interface Partner {
   shiftEnd: string;   // e.g., "17:00"
   currentLoad: number;
   rating: number; // e.g., 4.5
-  avatarUrl?: string;
   registrationDate: string; // ISO string (maps to created_at from Supabase)
 }
 
@@ -30,7 +29,7 @@ export type OrderStatus = 'pending' | 'assigned' | 'in-transit' | 'delivered' | 
 export interface Order {
   id: string;
   customerName: string;
-  customerPhone?: string; // Added customer phone
+  customerPhone?: string; 
   items: { name: string; quantity: number }[];
   status: OrderStatus;
   area: string;

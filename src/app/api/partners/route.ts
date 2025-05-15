@@ -6,18 +6,17 @@ import { PARTNER_STATUSES } from '@/lib/constants';
 
 // GET /api/partners
 export async function GET(request: Request) {
-  // Log directly within the API route handler
   console.log("/api/partners GET: NEXT_PUBLIC_SUPABASE_URL =", process.env.NEXT_PUBLIC_SUPABASE_URL ? "Exists" : "MISSING_OR_EMPTY");
   console.log("/api/partners GET: NEXT_PUBLIC_SUPABASE_ANON_KEY =", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "Exists" : "MISSING_OR_EMPTY");
+  console.log("/api/partners GET: Direct access process.env.NEXT_PUBLIC_SUPABASE_URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
+
 
   console.log("GET /api/partners received request");
 
   const supabaseUrlPresent = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKeyPresent = !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  // This log was already here and is good.
   console.log(`Supabase URL Present (from GET /api/partners): ${supabaseUrlPresent}, Supabase Anon Key Present (from GET /api/partners): ${supabaseAnonKeyPresent}`);
 
-  // This check is redundant if supabase client initializes, but good for belt-and-suspenders
   if (!supabaseUrlPresent || !supabaseAnonKeyPresent) {
     console.error("API Route /api/partners: Supabase environment variables are missing according to direct process.env check!");
     return NextResponse.json({ 
@@ -33,7 +32,7 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from('delivery_partners')
-      .select('*');
+      .select('id, name, email, phone, status, areas, shift_start, shift_end, current_load, rating, created_at');
 
     if (statusFilter) {
       if (PARTNER_STATUSES.includes(statusFilter)) {
@@ -75,7 +74,6 @@ export async function GET(request: Request) {
       shiftEnd: p.shift_end,     
       currentLoad: p.current_load ?? 0,
       rating: p.rating ?? 0,
-      avatarUrl: p.avatar_url,
       registrationDate: p.created_at, 
     }));
 
@@ -115,14 +113,13 @@ export async function POST(request: Request) {
       shift_end: body.shiftEnd,     
       current_load: body.currentLoad ?? 0,
       rating: body.rating ?? 0,
-      avatar_url: body.avatarUrl,
     };
     console.log('Attempting to insert new partner:', newPartnerData);
 
     const { data, error } = await supabase
       .from('delivery_partners')
       .insert(newPartnerData)
-      .select()
+      .select('id, name, email, phone, status, areas, shift_start, shift_end, current_load, rating, created_at')
       .single(); 
 
     if (error) {
@@ -151,7 +148,6 @@ export async function POST(request: Request) {
       shiftEnd: data.shift_end,
       currentLoad: data.current_load ?? 0,
       rating: data.rating ?? 0,
-      avatarUrl: data.avatar_url,
       registrationDate: data.created_at,
     };
 
@@ -165,4 +161,3 @@ export async function POST(request: Request) {
     }, { status: 500 });
   }
 }
-

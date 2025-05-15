@@ -4,7 +4,6 @@
 import React, { useState, useMemo } from 'react';
 import type { Partner, PartnerStatus } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -123,7 +122,6 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[80px]">Avatar</TableHead>
                 <TableHead onClick={() => handleSort('name')} className="cursor-pointer hover:bg-muted/50">
                   Name {renderSortIcon('name')}
                 </TableHead>
@@ -144,12 +142,6 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
             <TableBody>
               {filteredAndSortedPartners.map((partner) => (
                 <TableRow key={partner.id}>
-                  <TableCell>
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={partner.avatarUrl} alt={partner.name} data-ai-hint="person face" />
-                      <AvatarFallback>{partner.name.substring(0, 2).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                  </TableCell>
                   <TableCell className="font-medium">{partner.name}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
