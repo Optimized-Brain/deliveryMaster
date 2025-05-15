@@ -33,7 +33,7 @@ function AssignedOrdersPopoverContent({
   deliveredOrders,
   cancelledOrders,
 }: AssignedOrdersPopoverContentProps) {
-  // console.log(`[AssignedOrdersPopoverContent] Rendering for ${partnerName}. Active: ${activeOrders.length}, Delivered: ${deliveredOrders.length}, Cancelled: ${cancelledOrders.length}`);
+  console.log(`[AssignedOrdersPopoverContent] Rendering for ${partnerName}. Active: ${activeOrders.length}, Delivered: ${deliveredOrders.length}, Cancelled: ${cancelledOrders.length}`);
 
   if (activeOrders.length === 0 && deliveredOrders.length === 0 && cancelledOrders.length === 0) {
     return <div className="p-4 text-muted-foreground text-sm">No orders found for {partnerName}.</div>;
@@ -175,13 +175,14 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
   useEffect(() => {
     console.log("[PartnerTable] useEffect for partners changed. Processing partners:", partners.length);
     partners.forEach(partner => {
-      if (!partnerOrderData[partner.id] || partnerOrderData[partner.id]?.error || partnerOrderData[partner.id]?.isLoading === false) { // Fetch if not present, errored, or already loaded (to refresh)
+      // Fetch if not present, or if it previously errored, or to refresh if already loaded
+      if (!partnerOrderData[partner.id] || partnerOrderData[partner.id]?.error || partnerOrderData[partner.id]?.isLoading === false) {
         console.log(`[PartnerTable] useEffect: Triggering fetch for partner ${partner.id}`);
         fetchOrdersForPartner(partner.id, partner.name);
       }
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [partners, fetchOrdersForPartner]); // partnerOrderData removed 
+  }, [partners, fetchOrdersForPartner, partnerOrderData]);
+
 
   const filteredAndSortedPartners = useMemo(() => {
     let processedPartners = [...partners];
@@ -294,9 +295,11 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                 const isLoadingPartnerOrders = ordersInfo?.isLoading === true;
                 const partnerOrderError = ordersInfo?.error;
                 
+                // Use live fetched data for active count in summary
                 const activeCount = ordersInfo?.active?.length || 0;
-                const deliveredCount = ordersInfo?.delivered?.length || 0;
-                const cancelledCount = ordersInfo?.cancelled?.length || 0;
+                // Use aggregate data from partner object for completed and cancelled for summary
+                const completedCount = partner.completedOrders;
+                const cancelledCount = partner.cancelledOrders;
 
 
                 return (
@@ -325,12 +328,12 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                                 <Loader2 className="h-4 w-4 animate-spin" />
                                 <span className="ml-1">Loading orders...</span>
                              </div>
-                        ) : partnerOrderError && !ordersInfo?.active ? ( // Check !ordersInfo.active to avoid showing error if there's old data
+                        ) : partnerOrderError && !ordersInfo?.active ? ( 
                             <div className="text-destructive text-center" title={partnerOrderError}>Error!</div>
                         ) : (
                             <div className="space-y-0.5 text-center">
                                 <p>Active: <span className="font-semibold">{activeCount}</span></p>
-                                <p>Delivered: <span className="font-semibold">{deliveredCount}</span></p>
+                                <p>Delivered: <span className="font-semibold">{completedCount}</span></p>
                                 <p>Cancelled: <span className="font-semibold">{cancelledCount}</span></p>
                                 <Popover>
                                 <PopoverTrigger asChild>

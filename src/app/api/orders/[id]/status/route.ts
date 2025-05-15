@@ -13,8 +13,10 @@ async function updatePartnerMetrics(
     | { type: 'increment_load' }
     | { type: 'decrement_load_and_increment_completed' }
     | { type: 'decrement_load_and_increment_cancelled' }
+    | { type: 'decrement_load_only'} // For report failure scenario where order goes back to pending
 ) {
   console.log(`[API updatePartnerMetrics] Updating metrics for partner ${partnerId} with action:`, metricAction.type);
+  
   const { data: partner, error: fetchError } = await supabase
     .from('delivery_partners')
     .select('current_load, completed_orders, cancelled_orders')
@@ -49,6 +51,10 @@ async function updatePartnerMetrics(
       updatePayload.current_load = Math.max(0, (partner.current_load || 0) - 1);
       updatePayload.cancelled_orders = (partner.cancelled_orders || 0) + 1;
       actionDescription = "load decremented, cancelled_orders incremented";
+      break;
+    case 'decrement_load_only':
+      updatePayload.current_load = Math.max(0, (partner.current_load || 0) - 1);
+      actionDescription = "load decremented";
       break;
   }
   console.log(`[API updatePartnerMetrics] Calculated update payload for partner ${partnerId}:`, updatePayload);
@@ -124,6 +130,7 @@ export async function PUT(request: Request, context: { params: Params }) {
   if (newOrderStatus === 'assigned' && assignedPartnerId) {
     orderUpdateData.assigned_to = assignedPartnerId;
   } else if (newOrderStatus === 'pending' || newOrderStatus === 'cancelled') {
+    // When cancelling or reverting to pending, ensure partner is cleared from order
     orderUpdateData.assigned_to = null; 
   }
   console.log(`[API PUT /api/orders/${orderId}/status] Order update payload:`, orderUpdateData);
@@ -153,14 +160,14 @@ export async function PUT(request: Request, context: { params: Params }) {
   console.log(`[API PUT /api/orders/${orderId}/status] Order ${orderId} successfully updated in 'orders' table.`);
   
   // Handle assignments table and partner metrics
-  let partnerMetricsMessage = "";
+  let partnerMetricsUpdateResult = { success: true, message: "" };
 
   if (newOrderStatus === 'assigned' && assignedPartnerId) {
     console.log(`[API PUT /api/orders/${orderId}/status] Order assigned to partner ${assignedPartnerId}. Logging assignment and updating partner load.`);
     const assignmentLogData = {
       order_id: orderId,
       partner_id: assignedPartnerId,
-      status: 'success', // Default to 'success' to satisfy NOT NULL and CHECK constraints
+      status: 'success', // Default to 'success' for initial assignment log as per current constraints
     };
     const { data: assignmentData, error: assignmentInsertError } = await supabase
       .from('assignments')
@@ -169,26 +176,27 @@ export async function PUT(request: Request, context: { params: Params }) {
       .single();
 
     if (assignmentInsertError || !assignmentData) {
-      console.error(`[API PUT /api/orders/${orderId}/status] FAILED to create assignment record:`, assignmentInsertError ? { code: assignmentInsertError.code, message: assignmentInsertError.message, details: assignmentInsertError.details } : 'No data returned after insert.');
-      // This is a critical failure for the assignment process.
-      return NextResponse.json({ message: `Order status updated, but FAILED to log assignment record. This is a critical issue. Supabase Code: ${assignmentInsertError?.code}`, error: assignmentInsertError?.message }, { status: 500 });
+      const errorMessage = `Failed to create assignment record for order ${orderId}. Supabase Code: ${assignmentInsertError?.code}. Message: ${assignmentInsertError?.message}. This is a critical issue.`;
+      console.error(`[API PUT /api/orders/${orderId}/status] ${errorMessage}`, assignmentInsertError ? { code: assignmentInsertError.code, message: assignmentInsertError.message, details: assignmentInsertError.details } : 'No data returned after insert.');
+      return NextResponse.json({ message: `Order status updated to '${newOrderStatus}', but ${errorMessage}`, error: assignmentInsertError?.message }, { status: 500 });
     }
     console.log(`[API PUT /api/orders/${orderId}/status] Successfully created assignment record ${assignmentData.id}.`);
     
-    const partnerLoadResult = await updatePartnerMetrics(assignedPartnerId, { type: 'increment_load' });
-    if (!partnerLoadResult.success) {
-        // Critical failure if partner load cannot be incremented
-        return NextResponse.json({ message: `Order assigned and logged, but critical partner metric update (load increment) failed: ${partnerLoadResult.message}`, error: partnerLoadResult.message }, { status: 500 });
+    partnerMetricsUpdateResult = await updatePartnerMetrics(assignedPartnerId, { type: 'increment_load' });
+    if (!partnerMetricsUpdateResult.success) {
+        const errorMessage = `Order assigned and logged, but critical partner metric update (load increment) failed: ${partnerMetricsUpdateResult.message}`;
+        console.error(`[API PUT /api/orders/${orderId}/status] ${errorMessage}`);
+        return NextResponse.json({ message: errorMessage, error: partnerMetricsUpdateResult.message }, { status: 500 });
     }
-    partnerMetricsMessage = partnerLoadResult.message;
 
   } else if (newOrderStatus === 'delivered' && originalAssignedPartnerId) {
-    console.log(`[API PUT /api/orders/${orderId}/status] Order delivered by partner ${originalAssignedPartnerId}. Updating partner metrics.`);
-    const partnerMetricsResult = await updatePartnerMetrics(originalAssignedPartnerId, { type: 'decrement_load_and_increment_completed' });
-    if (!partnerMetricsResult.success) {
-        return NextResponse.json({ message: `Order marked delivered, but critical partner metric update failed: ${partnerMetricsResult.message}`, error: partnerMetricsResult.message }, { status: 500 });
+    console.log(`[API PUT /api/orders/${orderId}/status] Order delivered by partner ${originalAssignedPartnerId}. Updating partner metrics and assignment record.`);
+    partnerMetricsUpdateResult = await updatePartnerMetrics(originalAssignedPartnerId, { type: 'decrement_load_and_increment_completed' });
+    if (!partnerMetricsUpdateResult.success) {
+        const errorMessage = `Order marked delivered, but critical partner metric update failed: ${partnerMetricsUpdateResult.message}`;
+        console.error(`[API PUT /api/orders/${orderId}/status] ${errorMessage}`);
+        return NextResponse.json({ message: errorMessage, error: partnerMetricsUpdateResult.message }, { status: 500 });
     }
-    partnerMetricsMessage = partnerMetricsResult.message;
     
     const { error: updateAssignmentError } = await supabase
       .from('assignments')
@@ -196,21 +204,23 @@ export async function PUT(request: Request, context: { params: Params }) {
       .eq('order_id', orderId)
       .eq('partner_id', originalAssignedPartnerId) 
       .order('created_at', { ascending: false }) 
-      .limit(1);
+      .limit(1); // Update the latest assignment for this order-partner pair to 'success'
 
     if (updateAssignmentError) {
-      console.warn(`[API PUT /api/orders/${orderId}/status] Warning: Failed to update assignment record to success:`, { code: updateAssignmentError.code, message: updateAssignmentError.message, details: updateAssignmentError.details });
       // Non-critical for this flow, but good to note
+      console.warn(`[API PUT /api/orders/${orderId}/status] Warning: Failed to update assignment record to success for delivered order:`, { code: updateAssignmentError.code, message: updateAssignmentError.message, details: updateAssignmentError.details });
+       partnerMetricsUpdateResult.message += ` (Warning: assignment log update failed: ${updateAssignmentError.message})`;
     }
 
   } else if (newOrderStatus === 'cancelled') { 
     console.log(`[API PUT /api/orders/${orderId}/status] Order cancelled. Updating partner metrics and assignment if applicable.`);
     if (originalAssignedPartnerId) {
-      const partnerMetricsResult = await updatePartnerMetrics(originalAssignedPartnerId, { type: 'decrement_load_and_increment_cancelled' });
-      if (!partnerMetricsResult.success) {
-          return NextResponse.json({ message: `Order marked cancelled, but critical partner metric update failed: ${partnerMetricsResult.message}`, error: partnerMetricsResult.message }, { status: 500 });
+      partnerMetricsUpdateResult = await updatePartnerMetrics(originalAssignedPartnerId, { type: 'decrement_load_and_increment_cancelled' });
+      if (!partnerMetricsUpdateResult.success) {
+          const errorMessage = `Order marked cancelled, but critical partner metric update failed: ${partnerMetricsUpdateResult.message}`;
+          console.error(`[API PUT /api/orders/${orderId}/status] ${errorMessage}`);
+          return NextResponse.json({ message: errorMessage, error: partnerMetricsUpdateResult.message }, { status: 500 });
       }
-      partnerMetricsMessage = partnerMetricsResult.message;
 
       const { error: updateAssignmentError } = await supabase
         .from('assignments')
@@ -218,12 +228,13 @@ export async function PUT(request: Request, context: { params: Params }) {
         .eq('order_id', orderId)
         .eq('partner_id', originalAssignedPartnerId)
         .order('created_at', { ascending: false })
-        .limit(1); 
+        .limit(1); // Update the latest assignment for this order-partner pair to 'failed'
       if (updateAssignmentError) {
         console.warn(`[API PUT /api/orders/${orderId}/status] Warning: Failed to update assignment record to failed (cancelled):`, { code: updateAssignmentError.code, message: updateAssignmentError.message, details: updateAssignmentError.details });
+        partnerMetricsUpdateResult.message += ` (Warning: assignment log update failed: ${updateAssignmentError.message})`;
       }
     } else {
-        partnerMetricsMessage = "No partner was assigned to this cancelled order."
+        partnerMetricsUpdateResult = { success: true, message: "No partner was assigned to this cancelled order." }
     }
   }
 
@@ -242,8 +253,8 @@ export async function PUT(request: Request, context: { params: Params }) {
   };
 
   let finalMessage = `Status for order ${orderId.substring(0,8)}... updated successfully to ${newOrderStatus}.`;
-  if (partnerMetricsMessage) {
-    finalMessage += ` ${partnerMetricsMessage}`;
+  if (partnerMetricsUpdateResult.message) {
+    finalMessage += ` ${partnerMetricsUpdateResult.message}`;
   }
 
   console.log(`[API PUT /api/orders/${orderId}/status] Successfully processed request. Sending response: ${finalMessage}`);
