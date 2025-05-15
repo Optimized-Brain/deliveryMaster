@@ -87,9 +87,10 @@ export async function DELETE(request: Request, context: { params: Params }) {
       .eq('id', id);
 
     if (error) {
+      // Log the detailed Supabase error on the server
       return NextResponse.json({ 
         message: `Failed to delete partner with ID ${id}. Supabase error occurred.`, 
-        error: error.message,
+        error: error.message, // Send Supabase message to client
         details: String(error.details ?? ''),
         code: error.code 
       }, { status: 500 });
@@ -106,6 +107,7 @@ export async function DELETE(request: Request, context: { params: Params }) {
     return NextResponse.json({ message: `Partner ${id} deleted successfully. ${count} row(s) affected.` }, { status: 200 });
 
   } catch (e) {
+    // Catch any other unexpected errors
     const errorMessage = e instanceof Error ? e.message : 'An unexpected server error occurred during deletion.';
     return NextResponse.json({ message: "Server error during partner deletion.", error: errorMessage }, { status: 500 });
   }

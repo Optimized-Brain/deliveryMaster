@@ -76,14 +76,15 @@ export default function PartnersPage() {
       try {
         const response = await fetch(`/api/partners/${partnerId}`, { method: 'DELETE' });
         
-        const result = await response.json(); // Always try to parse JSON response
+        const result = await response.json(); 
 
-        if (!response.ok) { // Check response.ok first
-          throw new Error(result.message || result.error || `Failed to delete partner. Status: ${response.status}`);
+        if (!response.ok) {
+          // Prioritize result.error (specific Supabase error), then result.message, then generic
+          const errorMessage = result.error || result.message || `Failed to delete partner. Status: ${response.status}`;
+          throw new Error(errorMessage);
         }
         
-        // Explicitly check if the API confirmed successful deletion (e.g. count > 0 message)
-        // Assuming successful response (200 OK) means deletion was confirmed by API
+        // If response.ok, it means API returned 200 (deletion confirmed by API)
         setPartners(prevPartners => prevPartners.filter(p => p.id !== partnerId));
         toast({ title: "Partner Deleted", description: result.message || `Partner ${partnerToDelete.name} has been successfully deleted.`, variant: "default" });
 
