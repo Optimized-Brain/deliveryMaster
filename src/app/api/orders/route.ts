@@ -42,7 +42,7 @@ export async function GET(request: Request) {
         .select('id, customer_name, customer_phone, items, status, area, created_at, customer_address, assigned_to, total_amount')
         .in('id', orderIds);
       
-      // Apply status filter if also present (though less common when filtering by partner's entire history)
+      // Apply status filter if also present
       if (statusFilter) {
         console.log(`[API GET /api/orders] Applying status filter: ${statusFilter} to partner's orders`);
         query = query.eq('status', statusFilter);
@@ -84,7 +84,7 @@ export async function GET(request: Request) {
       creationDate: o.created_at,
       deliveryAddress: o.customer_address,
       assignedPartnerId: o.assigned_to,
-      orderValue: o.total_amount,
+      orderValue: Number(o.total_amount) || 0, // Ensure orderValue is a number, default to 0
     }));
 
     console.log(`[API GET /api/orders] Mapped ${orders.length} orders. Sending response.`);
@@ -164,7 +164,7 @@ export async function POST(request: Request) {
       creationDate: data.created_at,
       deliveryAddress: data.customer_address,
       assignedPartnerId: data.assigned_to,
-      orderValue: data.total_amount,
+      orderValue: Number(data.total_amount) || 0, // Ensure orderValue is a number, default to 0
     };
 
     return NextResponse.json({ message: 'Order created successfully', order: createdOrder }, { status: 201 });

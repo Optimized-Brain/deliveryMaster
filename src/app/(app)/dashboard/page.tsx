@@ -48,7 +48,7 @@ export default function DashboardPage() {
         order => order.status === 'delivered' && new Date(order.creationDate) >= thirtyDaysAgo
       ).length;
 
-      const totalValue = fetchedOrders.reduce((sum, order) => sum + order.orderValue, 0);
+      const totalValue = fetchedOrders.reduce((sum, order) => sum + (Number(order.orderValue) || 0), 0);
       const avgOrderValue = totalOrders > 0 ? (totalValue / totalOrders) : 0;
 
       setMetrics(prevMetrics => prevMetrics.map(metric => {
