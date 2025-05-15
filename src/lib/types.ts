@@ -48,3 +48,21 @@ export interface Metric {
   change?: string; // e.g., "+5%" or "-2"
   changeType?: 'positive' | 'negative' | 'neutral';
 }
+
+export type Assignment = {
+  orderId: string;
+  partnerId: string;
+  timestamp: Date;
+  status: 'success' | 'failed';
+  reason?: string;
+};
+
+export type AssignmentMetrics = {
+  totalAssigned: number;
+  successRate: number; // e.g., 0.95 for 95%
+  averageTime: number; // e.g., in minutes or seconds
+  failureReasons: {
+    reason: string;
+    count: number;
+  }[];
+};
