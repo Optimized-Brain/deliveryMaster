@@ -22,6 +22,8 @@ export interface Partner {
   currentLoad: number;
   rating: number; // e.g., 4.5
   registrationDate: string; // ISO string (maps to created_at from Supabase)
+  completedOrders: number;
+  cancelledOrders: number;
 }
 
 export type OrderStatus = 'pending' | 'assigned' | 'picked' | 'delivered' | 'cancelled';
@@ -39,14 +41,14 @@ export interface Order {
   orderValue: number; // maps to orders.total_amount
 }
 
-export type AssignmentStatus = 'success' | 'failed' | 'active' ;
-
+// This type describes the state of an assignment *after* an outcome
+// or issue has potentially been recorded.
 export type Assignment = {
   id: string; // assignment id
   orderId: string;
   partnerId: string;
   timestamp: string; // Supabase created_at for the assignment record
-  status: AssignmentStatus;
+  status: 'success' | 'failed' | 'active'; // 'active' is the initial state
   reason?: string; // Reason for failure, if status is 'failed'
 };
 
@@ -56,8 +58,9 @@ export interface FailedAssignmentInfo {
   customerName: string;
   area: string;
   failureReason: string;
-  reportedAt: string; // Timestamp of when the assignment record was created/updated (assignments.created_at)
+  reportedAt: string; // Timestamp of when the assignment record was created (assignments.created_at)
 }
+
 
 export interface Metric {
   id: string;

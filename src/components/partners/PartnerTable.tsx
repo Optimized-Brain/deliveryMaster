@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { ArrowUpDown, MoreHorizontal, Edit2, Trash2, Phone, Mail, Loader2, PackageCheck, PackageSearch, PackageX, EyeIcon } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, Edit2, Trash2, Phone, Mail, Loader2, PackageCheck, PackageSearch, PackageX, EyeIcon, Briefcase } from "lucide-react";
 import { cn } from '@/lib/utils';
 import { PARTNER_STATUSES } from '@/lib/constants';
 import Link from 'next/link';
@@ -31,17 +31,17 @@ interface PartnerOrderFetchData {
 
 interface AssignedOrdersPopoverContentProps {
   partnerName: string;
-  partnerId: string; 
+  partnerId: string;
   activeOrders: Order[];
   deliveredOrders: Order[];
   cancelledOrders: Order[];
 }
 
-function AssignedOrdersPopoverContent({ 
+function AssignedOrdersPopoverContent({
   partnerName,
   partnerId,
-  activeOrders, 
-  deliveredOrders, 
+  activeOrders,
+  deliveredOrders,
   cancelledOrders,
 }: AssignedOrdersPopoverContentProps) {
 
@@ -99,7 +99,7 @@ function AssignedOrdersPopoverContent({
             </ul>
           </div>
         )}
-        
+
         {(activeOrders.length > 0 || deliveredOrders.length > 0 || cancelledOrders.length > 0) && (
           <Button variant="link" size="sm" asChild className="p-0 h-auto text-primary hover:underline mt-2 text-xs">
             <Link href={`/orders?assignedPartnerId=${partnerId}`}>
@@ -131,7 +131,6 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
   const [partnerOrderData, setPartnerOrderData] = useState<Record<string, PartnerOrderFetchData>>({});
 
   const fetchOrdersForPartner = useCallback(async (partnerId: string, partnerName: string) => {
-    console.log(`[PartnerTable] Initiating fetch for partner ID: ${partnerId}, Name: ${partnerName}`);
     setPartnerOrderData(prev => ({
       ...prev,
       [partnerId]: { ...(prev[partnerId] || { orders: { active: [], delivered: [], cancelled: [] } }), isLoading: true, error: null }
@@ -147,13 +146,10 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
         throw new Error(message);
       }
       const orders: Order[] = await response.json();
-      console.log(`[PartnerTable] Raw orders fetched for partner ${partnerId}:`, JSON.stringify(orders));
 
       const active = orders.filter(o => o.status === 'assigned' || o.status === 'picked');
       const delivered = orders.filter(o => o.status === 'delivered');
       const cancelled = orders.filter(o => o.status === 'cancelled');
-      
-      console.log(`[PartnerTable] Categorized for partner ${partnerId} - Active: ${active.length}, Delivered: ${delivered.length}, Cancelled: ${cancelled.length}`);
 
       setPartnerOrderData(prev => ({
         ...prev,
@@ -161,7 +157,6 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
       }));
     } catch (e) {
       const errorMessage = (e as Error).message;
-      console.error(`[PartnerTable] Error fetching orders for partner ${partnerId}:`, errorMessage);
       setPartnerOrderData(prev => ({
         ...prev,
         [partnerId]: { ...(prev[partnerId] || { orders: { active: [], delivered: [], cancelled: [] } }), isLoading: false, error: errorMessage }
@@ -172,22 +167,15 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
         variant: "destructive"
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toast]); // Removed fetchOrdersForPartner from its own deps, toast is stable
+  }, [toast]); // fetchOrdersForPartner should not be in its own dependency array
 
   useEffect(() => {
-    console.log("[PartnerTable] Partners prop changed or component mounted/updated. Current partners:", partners);
     partners.forEach(partner => {
-      if (!partnerOrderData[partner.id] || partnerOrderData[partner.id]?.error) { 
-        console.log(`[PartnerTable] useEffect: Needs to fetch for partner ${partner.id}`);
+      if (!partnerOrderData[partner.id] || partnerOrderData[partner.id]?.error) {
         fetchOrdersForPartner(partner.id, partner.name);
-      } else {
-        console.log(`[PartnerTable] useEffect: Data already exists or no error for partner ${partner.id}`);
       }
     });
-  // fetchOrdersForPartner is stable due to its useCallback deps.
-  // partners is the primary trigger for re-evaluation.
-  }, [partners, fetchOrdersForPartner]);
+  }, [partners, fetchOrdersForPartner, partnerOrderData]); // Added partnerOrderData to re-evaluate if necessary
 
 
   const filteredAndSortedPartners = useMemo(() => {
@@ -209,8 +197,8 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
       processedPartners.sort((a, b) => {
         let valA = a[sortKey as keyof Partner];
         let valB = b[sortKey as keyof Partner];
-        
-        if (sortKey === 'currentLoad' || sortKey === 'rating') {
+
+        if (['currentLoad', 'rating', 'completedOrders', 'cancelledOrders'].includes(sortKey)) {
             valA = Number(valA);
             valB = Number(valB);
         } else if (typeof valA === 'string' && typeof valB === 'string') {
@@ -234,10 +222,10 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
       setSortOrder('asc');
     }
   };
-  
+
   const getStatusBadgeVariant = (status: PartnerStatus) => {
     switch (status) {
-      case 'active': return 'default'; 
+      case 'active': return 'default';
       case 'inactive': return 'secondary';
       case 'on-break': return 'outline';
       default: return 'secondary';
@@ -253,7 +241,7 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
 
   const renderSortIcon = (key: SortKey) => {
     if (sortKey !== key) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />;
-    return sortOrder === 'asc' ? <ArrowUpDown className="ml-2 h-4 w-4" /> : <ArrowUpDown className="ml-2 h-4 w-4" />; 
+    return sortOrder === 'asc' ? <ArrowUpDown className="ml-2 h-4 w-4" /> : <ArrowUpDown className="ml-2 h-4 w-4" />;
   };
 
   return (
@@ -289,8 +277,8 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                 <TableHead>Contact</TableHead>
                 <TableHead onClick={() => handleSort('status')} className="cursor-pointer hover:bg-muted/50">Status {renderSortIcon('status')}</TableHead>
                 <TableHead>Areas</TableHead>
-                <TableHead onClick={() => handleSort('currentLoad')} className="cursor-pointer hover:bg-muted/50 text-center">Load {renderSortIcon('currentLoad')}</TableHead>
-                <TableHead className="text-center">Order Summary</TableHead>
+                <TableHead onClick={() => handleSort('currentLoad')} className="cursor-pointer hover:bg-muted/50 text-center whitespace-nowrap">Current Load {renderSortIcon('currentLoad')}</TableHead>
+                <TableHead className="text-center">Order History</TableHead>
                 <TableHead onClick={() => handleSort('rating')} className="cursor-pointer hover:bg-muted/50 text-center">Rating {renderSortIcon('rating')}</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -298,9 +286,9 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
             <TableBody>
               {filteredAndSortedPartners.map((partner) => {
                 const currentPartnerOrdersData = partnerOrderData[partner.id];
-                const ordersSummary = currentPartnerOrdersData?.orders || { active: [], delivered: [], cancelled: [] };
-                const isLoadingOrders = currentPartnerOrdersData?.isLoading === true;
-                const orderError = currentPartnerOrdersData?.error;
+                const popoverOrders = currentPartnerOrdersData?.orders || { active: [], delivered: [], cancelled: [] };
+                const isLoadingPartnerOrders = currentPartnerOrdersData?.isLoading === true;
+                const partnerOrderError = currentPartnerOrdersData?.error;
 
                 return (
                   <TableRow key={partner.id}>
@@ -322,38 +310,39 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                       {partner.assignedAreas.join(', ')}
                     </TableCell>
                     <TableCell className="text-center">{partner.currentLoad}</TableCell>
-                    <TableCell className="text-center text-xs align-top pt-3 min-w-[120px]">
-                      {isLoadingOrders ? (
-                        <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                      ) : orderError ? (
-                        <div className="text-destructive text-xs" title={orderError}>Error!</div>
+                    <TableCell className="text-center text-xs align-top pt-3 min-w-[150px]">
+                       <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 items-center justify-center">
+                          <span className="text-right font-medium">Completed:</span>
+                          <span className="text-left">{partner.completedOrders}</span>
+                          <span className="text-right font-medium">Cancelled:</span>
+                          <span className="text-left">{partner.cancelledOrders}</span>
+                      </div>
+                      {isLoadingPartnerOrders ? (
+                        <Loader2 className="h-4 w-4 animate-spin mx-auto mt-1" />
+                      ) : partnerOrderError ? (
+                        <div className="text-destructive text-xs mt-1" title={partnerOrderError}>Error!</div>
                       ) : (
-                        <div className="space-y-0.5">
-                          <div>Act: <Badge variant="outline" className="px-1.5 py-0 text-xs font-normal">{ordersSummary.active.length}</Badge></div>
-                          <div>Del: <Badge variant="outline" className="px-1.5 py-0 text-xs font-normal">{ordersSummary.delivered.length}</Badge></div>
-                          <div>Can: <Badge variant="outline" className="px-1.5 py-0 text-xs font-normal">{ordersSummary.cancelled.length}</Badge></div>
                            <Popover>
                             <PopoverTrigger asChild>
-                              <Button variant="link" size="sm" className="p-0 h-auto text-xs mt-1" disabled={isLoadingOrders || !!orderError}>
-                                <EyeIcon className="mr-1 h-3 w-3" /> View Details
+                              <Button variant="link" size="sm" className="p-0 h-auto text-xs mt-1">
+                                <Briefcase className="mr-1 h-3 w-3" /> View Active List
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent 
+                            <PopoverContent
                               className="w-auto p-0"
-                              onOpenAutoFocus={(e) => e.preventDefault()} 
-                              align="center" 
+                              onOpenAutoFocus={(e) => e.preventDefault()}
+                              align="center"
                               side="bottom"
                             >
-                              <AssignedOrdersPopoverContent 
+                              <AssignedOrdersPopoverContent
                                 partnerId={partner.id}
                                 partnerName={partner.name}
-                                activeOrders={ordersSummary.active}
-                                deliveredOrders={ordersSummary.delivered}
-                                cancelledOrders={ordersSummary.cancelled}
+                                activeOrders={popoverOrders.active}
+                                deliveredOrders={popoverOrders.delivered}
+                                cancelledOrders={popoverOrders.cancelled}
                               />
                             </PopoverContent>
                           </Popover>
-                        </div>
                       )}
                     </TableCell>
                     <TableCell className="text-center">{partner.rating.toFixed(1)}</TableCell>
@@ -372,8 +361,8 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                             </DropdownMenuItem>
                           )}
                           {onDeletePartner && (
-                            <DropdownMenuItem 
-                              onClick={() => onDeletePartner(partner.id)} 
+                            <DropdownMenuItem
+                              onClick={() => onDeletePartner(partner.id)}
                               className="text-destructive focus:text-destructive focus:bg-destructive/10"
                             >
                               <Trash2 className="mr-2 h-4 w-4" /> Delete
@@ -392,6 +381,3 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
     </div>
   );
 }
-    
-
-    

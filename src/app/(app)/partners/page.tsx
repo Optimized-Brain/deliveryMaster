@@ -28,7 +28,7 @@ export default function PartnersPage() {
           if (errorText.toLowerCase().includes("<!doctype html>")) {
              errorDetails = `Failed to fetch partners. Server returned an HTML error page (status: ${response.status}). Check server logs.`;
           } else if (errorText) {
-            const errorData = JSON.parse(errorText); 
+            const errorData = JSON.parse(errorText);
             errorDetails = errorData.error || errorData.message || errorDetails;
           }
         } catch (parseError) {
@@ -39,10 +39,10 @@ export default function PartnersPage() {
       const data: Partner[] = await response.json();
       setPartners(data);
     } catch (error) {
-      toast({ 
-        title: "Error Loading Partners", 
-        description: (error as Error).message, 
-        variant: "destructive" 
+      toast({
+        title: "Error Loading Partners",
+        description: (error as Error).message,
+        variant: "destructive"
       });
       setPartners([]);
     } finally {
@@ -58,76 +58,53 @@ export default function PartnersPage() {
     const partnerToEdit = partners.find(p => p.id === partnerId);
     if (partnerToEdit) {
       setEditingPartner(partnerToEdit);
-      setActiveTab("register"); 
+      setActiveTab("register");
       toast({ title: "Editing Partner", description: `Editing details for ${partnerToEdit.name}` });
     } else {
       toast({ title: "Error", description: "Could not find partner to edit.", variant: "destructive" });
     }
   };
 
-  const handleDeletePartner = async (partnerId: string) => {
+ const handleDeletePartner = async (partnerId: string) => {
     const partnerToDelete = partners.find(p => p.id === partnerId);
     if (!partnerToDelete) {
-      toast({ title: "Error", description: "Partner not found for deletion in local list.", variant: "destructive" });
+      toast({ title: "Error", description: "Partner not found for deletion.", variant: "destructive" });
       return;
     }
 
-    console.log(`[PartnersPage] handleDeletePartner ENTERED for ID: ${partnerId}, Name: ${partnerToDelete.name}`);
-
     if (window.confirm(`Are you sure you want to delete partner "${partnerToDelete.name}"? This action cannot be undone.`)) {
-      console.log(`[PartnersPage] User confirmed deletion for partner: ${partnerToDelete.name}. API call to /api/partners/${partnerId}`);
       try {
         const response = await fetch(`/api/partners/${partnerId}`, { method: 'DELETE' });
-        
-        console.log(`[PartnersPage] DELETE /api/partners/${partnerId} response status: ${response.status}, statusText: ${response.statusText}`);
-        
-        const resultText = await response.text(); // Get text first to avoid parsing errors on empty/non-JSON
-        let result;
-        try {
-          result = JSON.parse(resultText);
-          console.log(`[PartnersPage] DELETE /api/partners/${partnerId} response body:`, result);
-        } catch (e) {
-          console.error(`[PartnersPage] Failed to parse JSON response from DELETE /api/partners/${partnerId}. Raw text: ${resultText}`);
-          if (!response.ok) { // If response was not ok AND we couldn't parse JSON
-             throw new Error(`Deletion failed. Server responded with status ${response.status} and non-JSON content.`);
-          }
-          // If response was ok but content wasn't JSON (e.g. 204 No Content, though our API returns JSON)
-          // This path should ideally not be hit if API always returns JSON or specific error.
-          result = { message: `Partner deleted (status ${response.status}, no JSON body).` }; 
-        }
-
+        const result = await response.json(); // Attempt to parse JSON regardless of status first
 
         if (!response.ok) {
+          // Prioritize API's error message, then a generic one
           const errorMessage = result.error || result.message || `Failed to delete partner. Status: ${response.status}`;
-          console.error(`[PartnersPage] Deletion failed for partner ${partnerToDelete.name}. Error: ${errorMessage}`);
           throw new Error(errorMessage);
         }
-        
-        // If response.ok, it means API returned 200 (deletion confirmed by API)
+
         setPartners(prevPartners => prevPartners.filter(p => p.id !== partnerId));
         toast({ title: "Partner Deleted", description: result.message || `Partner ${partnerToDelete.name} has been successfully deleted.`, variant: "default" });
-        console.log(`[PartnersPage] Successfully deleted partner ${partnerToDelete.name} from UI and showed toast.`);
 
       } catch (error) {
-        console.error(`[PartnersPage] Error during partner deletion process for ${partnerToDelete.name}:`, error);
-        toast({ 
-          title: "Deletion Failed", 
-          description: (error as Error).message || "An unexpected error occurred during deletion.", 
-          variant: "destructive" 
+        toast({
+          title: "Deletion Failed",
+          description: (error as Error).message || "An unexpected error occurred during deletion.",
+          variant: "destructive"
         });
       }
     } else {
-      console.log(`[PartnersPage] Deletion of partner ${partnerToDelete.name} was cancelled by user.`);
       toast({ title: "Deletion Cancelled", description: `Deletion of partner ${partnerToDelete.name} was cancelled.`, variant: "default" });
     }
   };
 
+
   const handlePartnerRegistered = () => {
-    fetchPartners(); 
-    setEditingPartner(null); 
-    setActiveTab("list"); 
+    fetchPartners();
+    setEditingPartner(null);
+    setActiveTab("list");
   };
-  
+
   const handlePartnerUpdated = () => {
     fetchPartners();
     setEditingPartner(null);
@@ -137,16 +114,16 @@ export default function PartnersPage() {
 
   const handleTabChange = (newTab: string) => {
     if (newTab === "list") {
-      setEditingPartner(null); 
+      setEditingPartner(null);
     }
     setActiveTab(newTab);
   }
 
   const handleAddNewPartnerClick = () => {
-    setEditingPartner(null); 
+    setEditingPartner(null);
     setActiveTab("register");
   }
-  
+
   const formTabTitle = editingPartner ? "Edit Partner Details" : "Register New Partner";
 
   return (
@@ -172,19 +149,19 @@ export default function PartnersPage() {
               <p className="ml-2">Loading partners...</p>
             </div>
           ) : (
-            <PartnerTable 
-              partners={partners} 
-              onEditPartner={handleEditPartner} 
-              onDeletePartner={handleDeletePartner} 
+            <PartnerTable
+              partners={partners}
+              onEditPartner={handleEditPartner}
+              onDeletePartner={handleDeletePartner}
             />
           )}
         </TabsContent>
         <TabsContent value="register" className="mt-6">
-          <PartnerRegistrationForm 
+          <PartnerRegistrationForm
             partnerToEdit={editingPartner}
-            onPartnerRegistered={handlePartnerRegistered} 
+            onPartnerRegistered={handlePartnerRegistered}
             onPartnerUpdated={handlePartnerUpdated}
-            key={editingPartner ? editingPartner.id : 'register-new'} 
+            key={editingPartner ? editingPartner.id : 'register-new'}
           />
         </TabsContent>
       </Tabs>

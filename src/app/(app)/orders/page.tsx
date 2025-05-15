@@ -38,7 +38,7 @@ export default function OrdersPage() {
   const [statusUiFilter, setStatusUiFilter] = useState<OrderStatus | "all">("all");
   const [areaUiFilter, setAreaUiFilter] = useState<string>("all");
   const [dateUiFilter, setDateUiFilter] = useState<Date | undefined>(undefined);
-  
+
   const [urlPartnerFilterId, setUrlPartnerFilterId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -48,64 +48,52 @@ export default function OrdersPage() {
 
 
   const fetchOrders = useCallback(async () => {
-    console.log("[OrdersPage Fetch] Starting fetchOrders...");
     setIsLoading(true);
     try {
-      const response = await fetch('/api/orders');
-      console.log("[OrdersPage Fetch] API response status:", response.status);
+      // Construct the API URL based on whether a partner ID filter is active from the URL
+      const apiUrl = urlPartnerFilterId ? `/api/orders?assignedPartnerId=${urlPartnerFilterId}` : '/api/orders';
+      const response = await fetch(apiUrl);
 
       if (!response.ok) {
         let errorMessage = `Failed to fetch orders (status: ${response.status})`;
         try {
-          const responseText = await response.text();
-          console.error("[OrdersPage Fetch] Raw error response from /api/orders:", responseText);
-          if (responseText.toLowerCase().includes("<!doctype html>")) {
+          const errorText = await response.text();
+          if (errorText.toLowerCase().includes("<!doctype html>")) {
             errorMessage = `Failed to fetch orders. Server returned an HTML error page (status: ${response.status}). Check server logs.`;
-          } else if (responseText.startsWith('{') || responseText.startsWith('[')) {
-             const errorData = JSON.parse(responseText);
+          } else if (errorText.startsWith('{') || errorText.startsWith('[')) {
+             const errorData = JSON.parse(errorText);
              errorMessage = errorData.error || errorData.message || errorMessage;
           } else {
              errorMessage = `Failed to fetch orders. Server returned a non-JSON error response (status: ${response.status}). Check server logs.`;
           }
         } catch (jsonParseError) {
-           console.error("[OrdersPage Fetch] Failed to parse JSON error response from /api/orders:", jsonParseError);
            errorMessage = `Failed to fetch orders. Server returned a non-JSON error response that also failed to parse (status: ${response.status}). Check server logs.`;
         }
         throw new Error(errorMessage);
       }
       const data: Order[] = await response.json();
-      console.log(`[OrdersPage Fetch] Successfully fetched ${data.length} orders.`);
       setAllOrders(data);
     } catch (error) {
-      console.error("[OrdersPage Fetch] Error caught in fetchOrders:", error);
       toast({
         title: "Error Loading Orders",
         description: (error as Error).message,
         variant: "destructive",
       });
-      setAllOrders([]); 
+      setAllOrders([]);
     } finally {
       setIsLoading(false);
-      console.log("[OrdersPage Fetch] fetchOrders finished.");
     }
-  }, [toast]);
+  }, [toast, urlPartnerFilterId]); // Add urlPartnerFilterId to dependencies
 
   useEffect(() => {
     fetchOrders();
-  }, [fetchOrders]);
+  }, [fetchOrders]); // fetchOrders will re-run if urlPartnerFilterId changes
 
   useEffect(() => {
     let tempOrders = allOrders;
 
-    if (urlPartnerFilterId) {
-      tempOrders = tempOrders.filter(order => order.assignedPartnerId === urlPartnerFilterId);
-       toast({
-        title: "Partner Filter Active",
-        description: `Showing orders for partner ID: ${urlPartnerFilterId.substring(0,8)}...`,
-        variant: "default", 
-      });
-    }
-
+    // No need to filter by urlPartnerFilterId here again, as fetchOrders now handles it.
+    // If urlPartnerFilterId was applied, allOrders will already be filtered.
 
     if (statusUiFilter && statusUiFilter !== "all") {
       tempOrders = tempOrders.filter(order => order.status === statusUiFilter);
@@ -121,13 +109,14 @@ export default function OrdersPage() {
       );
     }
     setFilteredOrders(tempOrders);
-  }, [allOrders, urlPartnerFilterId, statusUiFilter, areaUiFilter, dateUiFilter, toast]);
+  }, [allOrders, statusUiFilter, areaUiFilter, dateUiFilter]);
 
 
   const handleFilterChange = (filters: { status?: OrderStatus | "all"; area?: string | "all"; date?: Date }) => {
+    // If user applies UI filters, we clear any URL-based partner filter
     if (urlPartnerFilterId) {
-        setUrlPartnerFilterId(null); 
-        router.replace('/orders', { scroll: false }); 
+        setUrlPartnerFilterId(null); // This will trigger a re-fetch by fetchOrders
+        router.replace('/orders', { scroll: false }); // Clean URL
         toast({
             title: "Partner Filter Cleared",
             description: "UI filters applied, partner-specific view cleared.",
@@ -144,8 +133,8 @@ export default function OrdersPage() {
     setAreaUiFilter("all");
     setDateUiFilter(undefined);
     if (urlPartnerFilterId) {
-      setUrlPartnerFilterId(null);
-      router.replace('/orders', { scroll: false }); 
+      setUrlPartnerFilterId(null); // Triggers re-fetch for all orders
+      router.replace('/orders', { scroll: false });
     }
   }
 
@@ -164,12 +153,11 @@ export default function OrdersPage() {
   };
 
   const handleOrderCreated = () => {
-    fetchOrders(); 
+    fetchOrders();
     setIsCreateOrderDialogOpen(false);
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: OrderStatus, successMessageBase: string) => {
-    console.log(`[OrdersPage] updateOrderStatus: orderId=${orderId}, newStatus=${newStatus}`);
     try {
       const response = await fetch(`/api/orders/${orderId}/status`, {
         method: 'PUT',
@@ -178,16 +166,13 @@ export default function OrdersPage() {
       });
 
       const responseBody = await response.json();
-      console.log(`[OrdersPage] updateOrderStatus API response for ${orderId} to ${newStatus}: status=${response.status}, body=`, responseBody);
-
 
       if (!response.ok) {
         throw new Error(responseBody.message || responseBody.error || `Failed to update order status to ${newStatus}`);
       }
       toast({ title: "Order Updated", description: responseBody.message || `${successMessageBase}` });
-      fetchOrders(); 
+      fetchOrders();
     } catch (error) {
-      console.error(`[OrdersPage] updateOrderStatus failed for order ${orderId} to ${newStatus}:`, error);
       toast({
         title: "Update Failed",
         description: (error as Error).message,
@@ -216,12 +201,14 @@ export default function OrdersPage() {
   };
 
   const handleCancelOrder = async (orderId: string) => {
-    console.log(`[OrdersPage] handleCancelOrder: Initiated for orderId=${orderId}`);
-    if (window.confirm(`Are you sure you want to cancel order ${orderId.substring(0,8)}...? This action cannot be undone.`)) {
-      console.log(`[OrdersPage] handleCancelOrder: User confirmed cancellation for orderId=${orderId}`);
+    const orderToCancel = allOrders.find(o => o.id === orderId);
+    if (!orderToCancel) {
+        toast({ title: "Error", description: "Order not found.", variant: "destructive" });
+        return;
+    }
+    if (window.confirm(`Are you sure you want to cancel order ${orderId.substring(0,8)}... for ${orderToCancel.customerName}? This action cannot be undone.`)) {
       updateOrderStatus(orderId, 'cancelled', `Order ${orderId.substring(0,8)}... has been cancelled.`);
     } else {
-      console.log(`[OrdersPage] handleCancelOrder: User cancelled the confirmation for orderId=${orderId}`);
       toast({ title: "Action Cancelled", description: "Order cancellation was cancelled.", variant: "default"});
     }
   };
