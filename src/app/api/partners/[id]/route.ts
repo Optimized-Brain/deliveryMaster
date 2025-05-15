@@ -22,13 +22,14 @@ export async function PUT(request: Request, context: { params: Params }) {
     if (body.email !== undefined) updateData.email = body.email;
     if (body.phone !== undefined) updateData.phone = body.phone;
     if (body.status !== undefined) updateData.status = body.status;
-    if (assignedAreasArray !== undefined) updateData.areas = assignedAreasArray;
-    if (body.shiftSchedule !== undefined) updateData.shift_schedule = body.shiftSchedule;
+    if (assignedAreasArray !== undefined) updateData.areas = assignedAreasArray; // maps to 'areas'
+    if (body.shiftStart !== undefined) updateData.shift_start = body.shiftStart; // maps to 'shift_start'
+    if (body.shiftEnd !== undefined) updateData.shift_end = body.shiftEnd;       // maps to 'shift_end'
     if (body.currentLoad !== undefined) updateData.current_load = body.currentLoad;
     if (body.rating !== undefined) updateData.rating = body.rating;
     if (body.avatarUrl !== undefined) updateData.avatar_url = body.avatarUrl;
     // created_at should not be updated
-    // updated_at is typically handled by Supabase automatically
+    // updated_at is handled by Supabase
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ message: 'No fields to update' }, { status: 400 });
@@ -43,14 +44,14 @@ export async function PUT(request: Request, context: { params: Params }) {
 
     if (error) {
       console.error(`Error updating partner ${id}:`, error);
-      if (error.code === 'PGRST116') { // PGRST116: Row to update not found
+      if (error.code === 'PGRST116') {
         return NextResponse.json({ message: `Partner with ID ${id} not found` }, { status: 404 });
       }
       return NextResponse.json({ message: `Error updating partner ${id}`, error: error.message }, { status: 500 });
     }
 
     if (!data) {
-      return NextResponse.json({ message: `Partner with ID ${id} not found or no data returned after update` }, { status: 404 });
+      return NextResponse.json({ message: `Partner with ID ${id} not found or no data returned` }, { status: 404 });
     }
     
     const updatedPartner: Partner = {
@@ -60,11 +61,12 @@ export async function PUT(request: Request, context: { params: Params }) {
       phone: data.phone,
       status: data.status as PartnerStatus,
       assignedAreas: data.areas || [],
-      shiftSchedule: data.shift_schedule,
+      shiftStart: data.shift_start,
+      shiftEnd: data.shift_end,
       currentLoad: data.current_load,
       rating: data.rating,
       avatarUrl: data.avatar_url,
-      registrationDate: data.created_at, // Mapped from created_at
+      registrationDate: data.created_at,
     };
 
     return NextResponse.json({ message: `Partner ${id} updated successfully`, partner: updatedPartner });

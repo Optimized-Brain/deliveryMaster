@@ -21,8 +21,9 @@ export async function GET(request: Request) {
     email: p.email,
     phone: p.phone,
     status: p.status as PartnerStatus,
-    assignedAreas: p.areas || [],
-    shiftSchedule: p.shift_schedule,
+    assignedAreas: p.areas || [], // maps 'areas' from DB to 'assignedAreas'
+    shiftStart: p.shift_start, // maps 'shift_start' from DB
+    shiftEnd: p.shift_end,     // maps 'shift_end' from DB
     currentLoad: p.current_load,
     rating: p.rating,
     avatarUrl: p.avatar_url,
@@ -37,25 +38,25 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    // Validate body (basic example, use Zod for robust validation)
-    if (!body.name || !body.email || !body.phone) {
+    // Validate body (basic example, use Zod for robust validation on API routes if needed)
+    if (!body.name || !body.email || !body.phone || !body.shiftStart || !body.shiftEnd) {
       return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
     }
     
     const assignedAreasArray = body.assignedAreas ? body.assignedAreas.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
 
-    // Supabase will automatically set created_at and updated_at
     const newPartnerData = {
       name: body.name,
       email: body.email,
       phone: body.phone,
       status: body.status || 'active',
-      areas: assignedAreasArray,
-      shift_schedule: body.shiftSchedule,
-      current_load: body.currentLoad || 0, // Default value
-      rating: body.rating || 0, // Default value
-      avatar_url: body.avatarUrl, // Optional
-      // created_at and updated_at are typically handled by Supabase
+      areas: assignedAreasArray, // maps 'assignedAreas' from body to 'areas' for DB
+      shift_start: body.shiftStart, // maps 'shiftStart' from body
+      shift_end: body.shiftEnd,     // maps 'shiftEnd' from body
+      current_load: body.currentLoad || 0,
+      rating: body.rating || 0,
+      avatar_url: body.avatarUrl,
+      // created_at and updated_at are handled by Supabase
     };
 
     const { data, error } = await supabase
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
     
     if (!data) {
       console.error('Failed to create partner, no data returned after insert.');
-      return NextResponse.json({ message: 'Failed to create partner, no data returned after insert. This might indicate an RLS issue preventing read-back.' }, { status: 500 });
+      return NextResponse.json({ message: 'Failed to create partner, no data returned. RLS issue?' }, { status: 500 });
     }
 
     const createdPartner: Partner = {
@@ -81,11 +82,12 @@ export async function POST(request: Request) {
       phone: data.phone,
       status: data.status as PartnerStatus,
       assignedAreas: data.areas || [],
-      shiftSchedule: data.shift_schedule,
+      shiftStart: data.shift_start,
+      shiftEnd: data.shift_end,
       currentLoad: data.current_load,
       rating: data.rating,
       avatarUrl: data.avatar_url,
-      registrationDate: data.created_at, // Mapped from created_at
+      registrationDate: data.created_at,
     };
 
     return NextResponse.json({ message: 'Partner created successfully', partner: createdPartner }, { status: 201 });

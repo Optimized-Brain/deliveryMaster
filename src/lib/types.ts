@@ -16,11 +16,12 @@ export interface Partner {
   phone: string;
   status: PartnerStatus;
   assignedAreas: string[];
-  shiftSchedule: string; // e.g., "Mon 9-5, Tue 9-5"
+  shiftStart: string; // e.g., "09:00"
+  shiftEnd: string;   // e.g., "17:00"
   currentLoad: number;
   rating: number; // e.g., 4.5
   avatarUrl?: string;
-  registrationDate: string;
+  registrationDate: string; // ISO string (maps to created_at from Supabase)
 }
 
 export type OrderStatus = 'pending' | 'assigned' | 'in-transit' | 'delivered' | 'cancelled';

@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+// Removed Textarea import as it's no longer used for shift schedule
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,14 +15,26 @@ import { PARTNER_STATUSES } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
 import type { PartnerStatus } from '@/lib/types';
 
+const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/; // HH:MM format
+
 const partnerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
   phone: z.string().min(10, "Phone number must be at least 10 digits"),
   status: z.enum(PARTNER_STATUSES as [PartnerStatus, ...PartnerStatus[]]),
   assignedAreas: z.string().min(1, "At least one area is required (comma-separated)"),
-  shiftSchedule: z.string().min(5, "Shift schedule is required"),
+  shiftStart: z.string().regex(timeRegex, "Invalid start time format (HH:MM)"),
+  shiftEnd: z.string().regex(timeRegex, "Invalid end time format (HH:MM)"),
   // avatarUrl could be added here if desired
+}).refine(data => {
+  // Optional: Add validation that shiftEnd is after shiftStart
+  if (data.shiftStart && data.shiftEnd) {
+    return data.shiftEnd > data.shiftStart;
+  }
+  return true;
+}, {
+  message: "Shift end time must be after shift start time",
+  path: ["shiftEnd"], // Attach error to shiftEnd field
 });
 
 type PartnerFormData = z.infer<typeof partnerSchema>;
@@ -41,7 +53,8 @@ export function PartnerRegistrationForm({ onPartnerRegistered }: PartnerRegistra
       phone: "",
       status: "active",
       assignedAreas: "",
-      shiftSchedule: "",
+      shiftStart: "09:00",
+      shiftEnd: "17:00",
     },
   });
 
@@ -55,7 +68,6 @@ export function PartnerRegistrationForm({ onPartnerRegistered }: PartnerRegistra
 
       if (!response.ok) {
         const errorData = await response.json();
-        // Prioritize errorData.error (from Supabase) then errorData.message (API's own message)
         throw new Error(errorData.error || errorData.message || 'Failed to register partner');
       }
 
@@ -66,7 +78,7 @@ export function PartnerRegistrationForm({ onPartnerRegistered }: PartnerRegistra
         variant: "default",
       });
       form.reset();
-      onPartnerRegistered?.(); // Callback to parent component
+      onPartnerRegistered?.();
     } catch (error) {
       console.error("Partner registration failed:", error);
       toast({
@@ -164,19 +176,34 @@ export function PartnerRegistrationForm({ onPartnerRegistered }: PartnerRegistra
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="shiftSchedule"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Shift Schedule</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="e.g., Mon-Fri 9am-5pm, Sat 10am-2pm" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField
+                control={form.control}
+                name="shiftStart"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Shift Start Time</FormLabel>
+                    <FormControl>
+                      <Input type="time" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="shiftEnd"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Shift End Time</FormLabel>
+                    <FormControl>
+                      <Input type="time" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting ? "Registering..." : "Register Partner"}
             </Button>
