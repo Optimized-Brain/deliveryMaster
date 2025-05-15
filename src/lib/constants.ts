@@ -1,6 +1,6 @@
 
 import type { NavItem, Partner, Order, Metric, PartnerStatus, OrderStatus } from '@/lib/types';
-import { LayoutDashboard, ListOrdered, Users, Shuffle, Activity, Star, MapPin } from 'lucide-react';
+import { LayoutDashboard, ListOrdered, Users, Shuffle, Package, BarChart3, Star, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 
 export const APP_NAME = "SwiftRoute";
 
@@ -11,18 +11,15 @@ export const NAV_LINKS: NavItem[] = [
   { href: '/assignment', label: 'Smart Assignment', icon: Shuffle },
 ];
 
-// Fallback sample data for components that might still rely on it during transition
-export const SAMPLE_PARTNERS: Partner[] = []; // Actual data should be fetched
-
-// Dummy Partner UUIDs for SAMPLE_ORDERS assignedPartnerId field
+// Sample Partner UUIDs for SAMPLE_ORDERS assignedPartnerId field
 const DUMMY_PARTNER_UUID_1 = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
 const DUMMY_PARTNER_UUID_2 = "a1b2c3d4-e5f6-7890-1234-567890abcdef";
 const DUMMY_PARTNER_UUID_3 = "b2c3d4e5-f6a7-8901-2345-67890abcdef0";
 
-// SAMPLE_ORDERS - Updated to match new OrderStatus constraints ('picked', no 'cancelled')
+// SAMPLE_ORDERS - Updated with UUIDs and 'picked' status. 'cancelled' is not a valid DB status.
 export const SAMPLE_ORDERS: Order[] = [
   {
-    id: '1d9c7c31-176a-4a40-9e0e-77a17dfc4b8f',
+    id: 'c3e8a7b8-972e-4c3a-8a8d-02b345a7cdef', // UUID
     customerName: 'Alice Smith',
     customerPhone: '555-0101',
     items: [{ name: 'Pepperoni Pizza', quantity: 1 }, { name: 'Coke', quantity: 4 }],
@@ -33,7 +30,7 @@ export const SAMPLE_ORDERS: Order[] = [
     orderValue: 22.50,
   },
   {
-    id: '3f2f7c70-8f98-40c7-96d9-83e9c817531a',
+    id: 'a1b2c3d4-e5f6-7890-1234-567890abc001', // UUID
     customerName: 'Bob Johnson',
     customerPhone: '555-0102',
     items: [{ name: 'Sushi Platter', quantity: 1 }],
@@ -94,7 +91,7 @@ export const SAMPLE_ORDERS: Order[] = [
     customerName: 'Grace Wilson',
     customerPhone: '555-0107',
     items: [{ name: 'Tacos (3)', quantity: 2 }, { name: 'Guacamole', quantity: 1 }],
-    status: 'picked', // Changed from 'in-transit'
+    status: 'picked', // Changed from 'in-transit' to 'picked'
     assignedPartnerId: DUMMY_PARTNER_UUID_1,
     area: 'Uptown',
     creationDate: "2024-05-12T12:30:00.000Z",
@@ -106,7 +103,7 @@ export const SAMPLE_ORDERS: Order[] = [
     customerName: 'Henry Moore',
     customerPhone: '555-0108',
     items: [{ name: 'Chicken Curry', quantity: 1 }, { name: 'Naan Bread', quantity: 2 }],
-    status: 'picked', // Changed from 'in-transit'
+    status: 'picked', // Changed from 'in-transit' to 'picked'
     assignedPartnerId: DUMMY_PARTNER_UUID_3,
     area: 'Midtown',
     creationDate: "2024-05-12T13:10:00.000Z",
@@ -130,7 +127,7 @@ export const SAMPLE_ORDERS: Order[] = [
     customerName: 'Jack Anderson',
     customerPhone: '555-0110',
     items: [{ name: 'Vegetable Stir-fry', quantity: 1 }, { name: 'Iced Tea', quantity: 1 }],
-    status: 'pending', // Changed from 'cancelled' to 'pending' as 'cancelled' is not allowed
+    status: 'pending',
     area: 'North End',
     creationDate: "2024-05-11T20:00:00.000Z",
     deliveryAddress: '707 Willow Way, North End, XY 12354',
@@ -139,40 +136,31 @@ export const SAMPLE_ORDERS: Order[] = [
 ];
 
 
-export const DASHBOARD_METRICS: Metric[] = [
+// Initial structure for dashboard metrics. Values will be updated dynamically in DashboardPage.tsx
+export const DASHBOARD_METRICS_CONFIG: Omit<Metric, 'value' | 'change' | 'changeType'>[] = [
   {
-    id: 'metric-partners',
-    title: 'Total Active Partners',
-    value: "N/A",
-    icon: Users,
-    change: '...',
-    changeType: 'neutral',
+    id: 'metric-total-orders',
+    title: 'Total Orders',
+    icon: Package,
   },
   {
-    id: 'metric-rating',
-    title: 'Average Partner Rating',
-    value: "N/A",
-    icon: Star,
-    change: '...',
-    changeType: 'neutral',
-  },
-  {
-    id: 'metric-orders',
+    id: 'metric-pending-orders',
     title: 'Pending Orders',
-    value: SAMPLE_ORDERS.filter(o => o.status === 'pending').length,
     icon: ListOrdered,
-    changeType: 'neutral',
   },
   {
-    id: 'metric-areas',
-    title: 'Top Performing Area',
-    value: 'N/A',
-    icon: MapPin,
-    changeType: 'neutral',
+    id: 'metric-delivered-orders',
+    title: 'Delivered (Last 30d)',
+    icon: BarChart3, // Using BarChart3 for 'delivered' as an example
+  },
+  {
+    id: 'metric-avg-order-value',
+    title: 'Avg. Order Value',
+    icon: DollarSign,
   },
 ];
 
 export const AVAILABLE_AREAS: string[] = ['Downtown', 'North End', 'Westside', 'Eastside', 'Suburbia', 'Financial District', 'Uptown', 'Midtown'];
 export const PARTNER_STATUSES: PartnerStatus[] = ['active', 'inactive', 'on-break'];
-// Updated ORDER_STATUSES to match database constraint
+// Database constraint: status = ANY (ARRAY['pending'::text, 'assigned'::text, 'picked'::text, 'delivered'::text])
 export const ORDER_STATUSES: OrderStatus[] = ['pending', 'assigned', 'picked', 'delivered'];

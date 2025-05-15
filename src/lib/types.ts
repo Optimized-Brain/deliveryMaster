@@ -24,7 +24,7 @@ export interface Partner {
   registrationDate: string; // ISO string (maps to created_at from Supabase)
 }
 
-// Updated OrderStatus to match database constraint
+// Database constraint: status = ANY (ARRAY['pending'::text, 'assigned'::text, 'picked'::text, 'delivered'::text])
 export type OrderStatus = 'pending' | 'assigned' | 'picked' | 'delivered';
 
 export interface Order {
@@ -36,8 +36,8 @@ export interface Order {
   area: string;
   creationDate: string; // ISO string
   deliveryAddress: string;
-  assignedPartnerId?: string;
-  orderValue: number;
+  assignedPartnerId?: string; // In Supabase: assigned_to (UUID)
+  orderValue: number; // In Supabase: total_amount
 }
 
 export interface Metric {
@@ -45,7 +45,7 @@ export interface Metric {
   title: string;
   value: string | number;
   icon: LucideIcon;
-  change?: string; // e.g., "+5%" or "-2"
+  change?: string;
   changeType?: 'positive' | 'negative' | 'neutral';
 }
 
@@ -66,3 +66,9 @@ export type AssignmentMetrics = {
     count: number;
   }[];
 };
+
+// Type for chart data
+export interface DailyOrdersChartData {
+  date: string; // Format: "MMM d"
+  orders: number;
+}
