@@ -1,11 +1,11 @@
 
-"use client"; 
+"use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { OrderFilters } from "@/components/orders/OrderFilters";
 import { OrderTable } from "@/components/orders/OrderTable";
 import { OrderCreationForm } from "@/components/orders/OrderCreationForm";
-import { OrderDetailsDialog } from "@/components/orders/OrderDetailsDialog"; 
+import { OrderDetailsDialog } from "@/components/orders/OrderDetailsDialog";
 import type { Order, OrderStatus } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from 'next/navigation';
@@ -23,7 +23,7 @@ import {
 export default function OrdersPage() {
   const { toast } = useToast();
   const router = useRouter();
-  const [allOrders, setAllOrders] = useState<Order[]>([]); 
+  const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateOrderDialogOpen, setIsCreateOrderDialogOpen] = useState(false);
@@ -53,7 +53,7 @@ export default function OrdersPage() {
       }
       const data: Order[] = await response.json();
       setAllOrders(data);
-      setFilteredOrders(data); 
+      setFilteredOrders(data);
     } catch (error) {
       console.error("Error fetching orders:", error);
       toast({
@@ -61,7 +61,7 @@ export default function OrdersPage() {
         description: (error as Error).message,
         variant: "destructive",
       });
-      setAllOrders([]); 
+      setAllOrders([]);
       setFilteredOrders([]);
     } finally {
       setIsLoading(false);
@@ -74,17 +74,17 @@ export default function OrdersPage() {
 
   const handleFilterChange = (filters: { status?: OrderStatus | "all"; area?: string | "all"; date?: Date }) => {
     let tempOrders = allOrders;
-    
+
     if (filters.status && filters.status !== "all") {
       tempOrders = tempOrders.filter(order => order.status === filters.status);
     }
-    
+
     if (filters.area && filters.area !== "all") {
       tempOrders = tempOrders.filter(order => order.area && filters.area && order.area.toLowerCase().includes(filters.area.toLowerCase()));
     }
-    
+
     if (filters.date) {
-      tempOrders = tempOrders.filter(order => 
+      tempOrders = tempOrders.filter(order =>
         new Date(order.creationDate).toDateString() === filters.date!.toDateString()
       );
     }
@@ -110,8 +110,8 @@ export default function OrdersPage() {
   };
 
   const handleOrderCreated = () => {
-    fetchOrders(); 
-    setIsCreateOrderDialogOpen(false); 
+    fetchOrders();
+    setIsCreateOrderDialogOpen(false);
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: OrderStatus, successMessage: string) => {
@@ -138,7 +138,7 @@ export default function OrdersPage() {
   };
 
   const handleMarkAsPickedUp = (orderId: string) => {
-    updateOrderStatus(orderId, 'in transit', `Order ${orderId} marked as picked up (in transit).`); // Changed 'in-transit'
+    updateOrderStatus(orderId, 'in-transit', `Order ${orderId} marked as picked up (in-transit).`);
   };
 
   const handleMarkAsDelivered = (orderId: string) => {
@@ -167,24 +167,24 @@ export default function OrdersPage() {
           </DialogContent>
         </Dialog>
       </div>
-      
+
       <OrderFilters onFilterChange={handleFilterChange} onClearFilters={handleClearFilters} />
-      
+
       {isLoading ? (
         <div className="flex justify-center items-center py-10">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="ml-2">Loading orders...</p>
         </div>
       ) : (
-        <OrderTable 
-          orders={filteredOrders} 
-          onViewOrder={handleViewOrder} 
+        <OrderTable
+          orders={filteredOrders}
+          onViewOrder={handleViewOrder}
           onAssignOrder={handleAssignOrder}
           onMarkAsPickedUp={handleMarkAsPickedUp}
           onMarkAsDelivered={handleMarkAsDelivered}
         />
       )}
-      <OrderDetailsDialog 
+      <OrderDetailsDialog
         order={selectedOrderForDetails}
         isOpen={isDetailsDialogOpen}
         onOpenChange={setIsDetailsDialogOpen}

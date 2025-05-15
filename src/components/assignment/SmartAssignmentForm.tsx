@@ -8,14 +8,14 @@ import * as z from 'zod';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel as RHFormLabel, FormMessage } from "@/components/ui/form"; // Renamed FormLabel to avoid conflict
-import { Label } from "@/components/ui/label"; // Standard Label
+import { Form, FormControl, FormField, FormItem, FormLabel as RHFormLabel, FormMessage } from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Wand2, CheckCircle } from "lucide-react"; // Removed Send icon
+import { Loader2, Wand2, CheckCircle } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { assignOrder, type AssignOrderInput, type AssignOrderOutput } from "@/ai/flows/smart-order-assignment";
 import { AssignmentResultCard } from './AssignmentResultCard';
-import type { Order, Partner } from "@/lib/types";
+import type { Order, Partner, OrderStatus } from "@/lib/types";
 import { useSearchParams, useRouter } from 'next/navigation';
 
 const assignmentSchema = z.object({
@@ -33,10 +33,10 @@ export function SmartAssignmentForm() {
   const [isFetchingSuggestion, setIsFetchingSuggestion] = useState(false);
   const [isConfirmingAssignment, setIsConfirmingAssignment] = useState(false);
   const [isDataLoading, setIsDataLoading] = useState(true);
-  
+
   const [aiSuggestion, setAiSuggestion] = useState<AssignOrderOutput | null>(null);
   const [selectedPartnerForAssignment, setSelectedPartnerForAssignment] = useState<string>('');
-  
+
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
   const [availablePartners, setAvailablePartners] = useState<Partner[]>([]);
 
@@ -54,7 +54,7 @@ export function SmartAssignmentForm() {
     setAvailablePartners([]);
     try {
       const [ordersResponse, partnersResponse] = await Promise.all([
-        fetch('/api/orders?status=pending'), 
+        fetch('/api/orders?status=pending'),
         fetch('/api/partners?status=active')
       ]);
 
@@ -64,10 +64,10 @@ export function SmartAssignmentForm() {
           const errorText = await ordersResponse.text();
           console.error("Raw error response from /api/orders?status=pending:", errorText);
           if (errorText.startsWith("<!DOCTYPE html>")) {
-            errorDetails = `Failed to fetch pending orders. Server returned an HTML error page (status: ${ordersResponse.status}). Check server logs.`;
+            errorDetails = `Failed to fetch pending orders. Server returned an HTML error page (status: ${ordersResponse.status}). Check server logs for the underlying error (e.g., environment variables).`;
           } else {
             const errorData = JSON.parse(errorText);
-            errorDetails = errorData.message || errorData.error || errorDetails;
+            errorDetails = errorData.error || errorData.message || errorDetails;
           }
         } catch (parseError) {
           console.error("Failed to parse JSON error response from fetching orders. Server might have sent HTML.", parseError);
@@ -86,8 +86,8 @@ export function SmartAssignmentForm() {
            if (errorText.startsWith("<!DOCTYPE html>")) {
             errorDetails = `Failed to fetch available partners. Server returned an HTML error page (status: ${partnersResponse.status}). Check server logs for the underlying error (e.g., environment variables).`;
           } else {
-            const errorData = JSON.parse(errorText); 
-            errorDetails = errorData.message || errorData.error || errorDetails;
+            const errorData = JSON.parse(errorText);
+            errorDetails = errorData.error || errorData.message || errorDetails;
           }
         } catch (parseError) {
             console.error("Failed to parse JSON error response from fetching partners. Server might have sent HTML.", parseError);
@@ -105,15 +105,13 @@ export function SmartAssignmentForm() {
           form.setValue('orderId', queryOrderId);
           form.setValue('orderLocation', selectedOrder.area);
         } else {
-            // If queryOrderId is present but not in pending orders, clear the form fields
-            // or inform the user the order is not assignable.
             form.resetField('orderId');
             form.resetField('orderLocation');
-            if (queryOrderId) { // Only toast if there was an attempt to pre-select
+            if (queryOrderId) {
                 toast({
                     title: "Order Not Assignable",
                     description: `Order ${queryOrderId} is not pending or not found. Please select another.`,
-                    variant: "default" 
+                    variant: "default"
                 });
             }
         }
@@ -129,7 +127,7 @@ export function SmartAssignmentForm() {
     } finally {
       setIsDataLoading(false);
     }
-  }, [toast, searchParams, form]); 
+  }, [toast, searchParams, form]);
 
   useEffect(() => {
     fetchData();
@@ -140,7 +138,7 @@ export function SmartAssignmentForm() {
     setAiSuggestion(null);
     setSelectedPartnerForAssignment('');
 
-    const selectedOrder = pendingOrders.find(o => o.id === data.orderId); 
+    const selectedOrder = pendingOrders.find(o => o.id === data.orderId);
     if (!selectedOrder) {
         toast({ title: "Error", description: "Selected order not found in pending orders list.", variant: "destructive"});
         setIsFetchingSuggestion(false);
@@ -152,13 +150,13 @@ export function SmartAssignmentForm() {
         setIsFetchingSuggestion(false);
         return;
     }
-    
+
     const input: AssignOrderInput = {
       orderId: data.orderId,
       orderLocation: data.orderLocation || selectedOrder.area,
       partnerList: availablePartners.map(p => ({
         partnerId: p.id,
-        location: p.assignedAreas[0] || 'Unknown', 
+        location: p.assignedAreas[0] || 'Unknown',
         currentLoad: p.currentLoad,
         assignedAreas: p.assignedAreas,
         isAvailable: p.status === 'active',
@@ -168,7 +166,7 @@ export function SmartAssignmentForm() {
     try {
       const result = await assignOrder(input);
       setAiSuggestion(result);
-      setSelectedPartnerForAssignment(result.suggestedPartnerId); 
+      setSelectedPartnerForAssignment(result.suggestedPartnerId);
       toast({
         title: "AI Suggestion Ready",
         description: `AI suggests partner ${result.suggestedPartnerId}. Review and confirm.`,
@@ -201,9 +199,9 @@ export function SmartAssignmentForm() {
       const updateResponse = await fetch(`/api/orders/${orderId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          status: 'assigned', 
-          assignedPartnerId: selectedPartnerForAssignment 
+        body: JSON.stringify({
+          status: 'assigned' as OrderStatus,
+          assignedPartnerId: selectedPartnerForAssignment
         }),
       });
 
@@ -211,10 +209,10 @@ export function SmartAssignmentForm() {
         let errorDetails = `Failed to update order ${orderId} status (API status: ${updateResponse.status}).`;
         try {
             const errorData = await updateResponse.json();
-            if (errorData && errorData.message) { 
+            if (errorData && errorData.message) {
                 errorDetails = errorData.message;
             } else {
-                 const errorText = await updateResponse.text(); 
+                 const errorText = await updateResponse.text();
                  console.error("Raw error text from PUT /api/orders/[id]/status:", errorText);
                  errorDetails = `Failed to update order status (API status: ${updateResponse.status}). ${errorText.substring(0,100)}`;
             }
@@ -224,20 +222,18 @@ export function SmartAssignmentForm() {
         }
         throw new Error(errorDetails);
       }
-      
+
       toast({
         title: "Order Assigned!",
         description: `Order ${orderId} successfully assigned to partner ${selectedPartnerForAssignment}.`,
         variant: "default"
       });
-      
-      // Reset form and state for next assignment
+
       form.reset({ orderId: "", orderLocation: "" });
-      setAiSuggestion(null); 
-      setSelectedPartnerForAssignment(''); 
-      fetchData(); // Refresh pending orders and available partners
-      // Optionally, navigate away or show a success message encouraging next action
-      // router.push('/orders'); // Example navigation
+      setAiSuggestion(null);
+      setSelectedPartnerForAssignment('');
+      fetchData();
+      // router.push('/orders');
 
     } catch (error) {
       console.error("Order assignment confirmation failed:", error);
@@ -276,18 +272,18 @@ export function SmartAssignmentForm() {
                 render={({ field }) => (
                   <FormItem>
                     <RHFormLabel>Order ID</RHFormLabel>
-                    <Select 
+                    <Select
                       onValueChange={(value) => {
                         field.onChange(value);
                         const currentSelectedOrder = pendingOrders.find(o => o.id === value);
                         if (currentSelectedOrder) {
-                          form.setValue("orderLocation", currentSelectedOrder.area); 
+                          form.setValue("orderLocation", currentSelectedOrder.area);
                         } else {
-                           form.setValue("orderLocation", ""); // Clear location if order not found/cleared
+                           form.setValue("orderLocation", "");
                         }
-                        setAiSuggestion(null); 
+                        setAiSuggestion(null);
                         setSelectedPartnerForAssignment('');
-                      }} 
+                      }}
                       value={field.value}
                       disabled={isDataLoading || isFetchingSuggestion || isConfirmingAssignment}
                     >
@@ -325,15 +321,15 @@ export function SmartAssignmentForm() {
                   </FormItem>
                 )}
               />
-              <Button 
-                type="submit" 
-                className="w-full" 
+              <Button
+                type="submit"
+                className="w-full"
                 disabled={isFetchingSuggestion || isDataLoading || pendingOrders.length === 0 || availablePartners.length === 0 || isConfirmingAssignment || !form.getValues('orderId')}
               >
                 {isFetchingSuggestion ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
-                  <Wand2 className="mr-2 h-4 w-4" /> 
+                  <Wand2 className="mr-2 h-4 w-4" />
                 )}
                 {isFetchingSuggestion ? "Getting Suggestion..." : "Get AI Suggestion"}
               </Button>
@@ -353,14 +349,14 @@ export function SmartAssignmentForm() {
           <div className="flex justify-center">
            <AssignmentResultCard suggestion={aiSuggestion} />
           </div>
-          
+
           <Card className="w-full max-w-xl mx-auto shadow-lg">
             <CardHeader>
               <CardTitle>Confirm Assignment</CardTitle>
               <CardDescription>Confirm the AI's suggestion or choose a different partner.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <FormItem> 
+              <FormItem>
                 <Label htmlFor="partner-select">Assign to Partner</Label>
                 <Select
                   value={selectedPartnerForAssignment}
@@ -379,8 +375,8 @@ export function SmartAssignmentForm() {
                   </SelectContent>
                 </Select>
               </FormItem>
-              <Button 
-                onClick={handleConfirmAssignment} 
+              <Button
+                onClick={handleConfirmAssignment}
                 className="w-full"
                 disabled={isConfirmingAssignment || !selectedPartnerForAssignment}
               >
