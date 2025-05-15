@@ -61,8 +61,9 @@ export async function PUT(request: Request, context: { params: Params }) {
     console.log(`PUT /api/orders/${orderId}/status: Order ${orderId} updated successfully to status ${status}.`);
 
     let partnerLoadUpdatedSuccessfully = true;
-    let assignmentLoggedSuccessfully = true;
+    let assignmentLoggedSuccessfully = true; // Assume true, will be set false on failure
     let assignmentLogError = "";
+
 
     // If order is being assigned, update partner load and log to assignments table
     if (status === 'assigned' && assignedPartnerId) {
@@ -72,8 +73,8 @@ export async function PUT(request: Request, context: { params: Params }) {
       const assignmentLogData = {
         order_id: orderId,
         partner_id: assignedPartnerId,
-        // 'created_at' should default to now() in the database.
-        // 'status' and 'reason' are intentionally NOT set here for initial assignment log
+        // 'created_at' or equivalent timestamp should default to now() in the database.
+        // 'status' and 'reason' for the assignment outcome are intentionally NOT set here for initial assignment log.
       };
       console.log(`PUT /api/orders/${orderId}/status: Attempting to create base assignment record in 'assignments' table with data:`, assignmentLogData);
       
@@ -90,13 +91,13 @@ export async function PUT(request: Request, context: { params: Params }) {
         // Return 500 as this is a critical failure in the assignment process
         return NextResponse.json({ 
           message: `Order status updated to '${status}', but FAILED to log assignment record. Please check server logs for details.`, 
-          error: assignmentLogError
+          error: assignmentLogError // Provide the specific Supabase error here
         }, { status: 500 });
       }
       
       if (!assignmentData && assignmentLoggedSuccessfully) { // Check assignmentLoggedSuccessfully to avoid double error message if insert already failed
           console.error(`PUT /api/orders/${orderId}/status: CRITICAL: Failed to create assignment record (no data returned after insert, but no direct Supabase error). This indicates a possible RLS issue or misconfiguration preventing SELECT after INSERT.`);
-          assignmentLoggedSuccessfully = false;
+          assignmentLoggedSuccessfully = false; // Should be redundant due to above check, but for safety
           assignmentLogError = 'Failed to confirm assignment record creation (no data returned after insert). This is a critical issue.';
           return NextResponse.json({
               message: `Order status updated to '${status}', but FAILED to confirm assignment record creation. Please check server logs.`,
@@ -104,7 +105,7 @@ export async function PUT(request: Request, context: { params: Params }) {
           }, { status: 500 });
       }
       
-      if(assignmentLoggedSuccessfully) {
+      if(assignmentLoggedSuccessfully) { // Should always be true if we reach here
         console.log(`PUT /api/orders/${orderId}/status: Base assignment record created successfully with ID: ${assignmentData!.id} for order ${orderId}, partner ${assignedPartnerId}.`);
       }
 
@@ -157,11 +158,9 @@ export async function PUT(request: Request, context: { params: Params }) {
     
     let successMessage = `Status for order ${orderId.substring(0,8)}... updated successfully to ${status}.`;
     if (status === 'assigned' && assignedPartnerId) {
-        if (!assignmentLoggedSuccessfully) { // This condition is now less likely to be met here due to early return
-            successMessage = `Order status updated to '${status}', but CRITICAL ERROR: ${assignmentLogError}. Please contact support.`;
-        } else {
-             successMessage += ` Assignment logged.`;
-        }
+        // The 'assignmentLoggedSuccessfully' check is now implicitly handled by the early return if logging fails.
+        // So, if we reach here, assignment logging was successful.
+        successMessage += ` Assignment logged.`;
         if (!partnerLoadUpdatedSuccessfully) {
             successMessage += ` WARNING: Failed to update partner load. Please check server logs.`;
         }
