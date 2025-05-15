@@ -83,36 +83,32 @@ export default function PartnersPage() {
 
     console.log(`[PartnersPage] About to confirm deletion for partner: "${partnerToDelete.name}"`);
     if (window.confirm(`Are you sure you want to delete partner "${partnerToDelete.name}"? This action cannot be undone.`)) {
-      console.log(`[PartnersPage] User confirmed deletion for partner: ${partnerToDelete.name}`);
+      console.log(`[PartnersPage] User confirmed deletion for partner: ${partnerToDelete.name}. API call to /api/partners/${partnerId}`);
       try {
         const response = await fetch(`/api/partners/${partnerId}`, { method: 'DELETE' });
-        console.log(`[PartnersPage] DELETE /api/partners/${partnerId} response status: ${response.status}`);
+        console.log(`[PartnersPage] DELETE /api/partners/${partnerId} response status: ${response.status}, statusText: ${response.statusText}`);
+
+        let responseBody;
+        const responseText = await response.text();
+        try {
+            responseBody = JSON.parse(responseText);
+        } catch (e) {
+            console.error(`[PartnersPage] Could not parse JSON response from delete API for ${partnerId}. Status: ${response.status}. Raw text: ${responseText.substring(0,500)}`);
+            responseBody = { message: responseText || `Non-JSON response from server (status: ${response.status})` };
+        }
+        console.log(`[PartnersPage] DELETE /api/partners/${partnerId} response body:`, responseBody);
+
 
         if (!response.ok) {
-          let errorDetails = `Failed to delete partner ${partnerToDelete.name}. Status: ${response.status}`;
-          try {
-            const errorData = await response.json();
-            console.log(`[PartnersPage] Error data from API for delete:`, errorData);
-            errorDetails = errorData.message || errorData.error || errorDetails;
-          } catch (e) {
-            const errorText = await response.text().catch(() => "Could not retrieve error text");
-            console.error(`[PartnersPage] Could not parse JSON error response from delete API for ${partnerId}. Status: ${response.status}. Raw text: ${errorText.substring(0,500)}`);
-            if (errorText.toLowerCase().includes("<!doctype html>")) {
-                errorDetails = `Failed to delete partner. Server returned an HTML error (status: ${response.status}). Check server logs.`;
-            } else if (response.statusText) {
-                 errorDetails = `Failed to delete partner. Server responded with: ${response.status} ${response.statusText}.`;
-            } else {
-                errorDetails = `Failed to delete partner (status: ${response.status}). Server returned non-JSON response.`;
-            }
-          }
+          const errorDetails = responseBody.message || responseBody.error || `Failed to delete partner ${partnerToDelete.name}. Status: ${response.status}`;
           console.error(`[PartnersPage] Delete operation failed: ${errorDetails}`);
           throw new Error(errorDetails);
         }
         
-        const result = await response.json(); 
-        console.log(`[PartnersPage] Successfully deleted partner ${partnerId} via API. API Message: ${result.message}`);
+        // Assuming response.ok means deletion was successful according to the API logic (which checks Supabase count)
+        console.log(`[PartnersPage] Successfully deleted partner ${partnerId} via API. API Message: ${responseBody.message}`);
         setPartners(prevPartners => prevPartners.filter(p => p.id !== partnerId));
-        toast({ title: "Partner Deleted", description: result.message || `Partner ${partnerToDelete.name} has been successfully deleted.`, variant: "default" });
+        toast({ title: "Partner Deleted", description: responseBody.message || `Partner ${partnerToDelete.name} has been successfully deleted.`, variant: "default" });
       } catch (error) {
         console.error(`[PartnersPage] Error during handleDeletePartner for ${partnerId}:`, error);
         toast({ 
