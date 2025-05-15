@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -12,21 +13,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Loader2, Send } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { assignOrder, type AssignOrderInput, type AssignOrderOutput } from "@/ai/flows/smart-order-assignment";
-import { SAMPLE_ORDERS, SAMPLE_PARTNERS } from "@/lib/constants"; // For populating dropdowns
 import { AssignmentResultCard } from './AssignmentResultCard';
+import type { Order, Partner } from '@/lib/types';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 const assignmentSchema = z.object({
   orderId: z.string().min(1, "Order ID is required"),
   orderLocation: z.string().min(3, "Order location is required"),
-  // partnerList is not part of the form, it will be fetched/provided
 });
 
 type AssignmentFormData = z.infer<typeof assignmentSchema>;
 
 export function SmartAssignmentForm() {
   const { toast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
+  const [isDataLoading, setIsDataLoading] = useState(true);
   const [assignmentResult, setAssignmentResult] = useState<AssignOrderOutput | null>(null);
+  
+  const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
+  const [availablePartners, setAvailablePartners] = useState<Partner[]>([]);
+  const [allOrders, setAllOrders] = useState<Order[]>([]);
+
 
   const form = useForm<AssignmentFormData>({
     resolver: zodResolver(assignmentSchema),
@@ -36,27 +45,73 @@ export function SmartAssignmentForm() {
     },
   });
 
-  const pendingOrders = SAMPLE_ORDERS.filter(order => order.status === 'pending');
-  const availablePartners = SAMPLE_PARTNERS.filter(partner => partner.status === 'active');
+  const fetchData = useCallback(async () => {
+    setIsDataLoading(true);
+    try {
+      const [ordersResponse, partnersResponse] = await Promise.all([
+        fetch('/api/orders?status=pending'), // Fetch only pending orders
+        fetch('/api/partners?status=active') // Fetch only active partners
+      ]);
+
+      if (!ordersResponse.ok) throw new Error('Failed to fetch pending orders');
+      const ordersData: Order[] = await ordersResponse.json();
+      setPendingOrders(ordersData);
+      setAllOrders(ordersData); // Keep a copy for finding selected order details
+
+      if (!partnersResponse.ok) throw new Error('Failed to fetch available partners');
+      const partnersData: Partner[] = await partnersResponse.json();
+      setAvailablePartners(partnersData);
+
+      // Pre-fill form if orderId is in query params
+      const queryOrderId = searchParams.get('orderId');
+      if (queryOrderId && ordersData.some(o => o.id === queryOrderId)) {
+        form.setValue('orderId', queryOrderId);
+        const selectedOrder = ordersData.find(o => o.id === queryOrderId);
+        if (selectedOrder) {
+          form.setValue('orderLocation', selectedOrder.area);
+        }
+      }
+
+    } catch (error) {
+      console.error("Failed to fetch data for assignment:", error);
+      toast({
+        title: "Data Loading Failed",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsDataLoading(false);
+    }
+  }, [toast, searchParams, form]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
 
   const onSubmit = async (data: AssignmentFormData) => {
     setIsLoading(true);
     setAssignmentResult(null);
 
-    const selectedOrder = SAMPLE_ORDERS.find(o => o.id === data.orderId);
+    const selectedOrder = allOrders.find(o => o.id === data.orderId); // Use allOrders to find details
     if (!selectedOrder) {
         toast({ title: "Error", description: "Selected order not found.", variant: "destructive"});
         setIsLoading(false);
         return;
     }
 
+    if (availablePartners.length === 0) {
+        toast({ title: "Error", description: "No available partners to assign the order to.", variant: "destructive"});
+        setIsLoading(false);
+        return;
+    }
+    
     const input: AssignOrderInput = {
       orderId: data.orderId,
-      orderLocation: data.orderLocation || selectedOrder.area, // Use form input or order area
+      orderLocation: data.orderLocation || selectedOrder.area,
       partnerList: availablePartners.map(p => ({
         partnerId: p.id,
-        location: p.assignedAreas[0] || 'Unknown', // Simplified: use first assigned area as location
+        location: p.assignedAreas[0] || 'Unknown', 
         currentLoad: p.currentLoad,
         assignedAreas: p.assignedAreas,
         isAvailable: p.status === 'active',
@@ -66,22 +121,51 @@ export function SmartAssignmentForm() {
     try {
       const result = await assignOrder(input);
       setAssignmentResult(result);
+      
+      // Update order status in Supabase
+      const updateResponse = await fetch(`/api/orders/${data.orderId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          status: 'assigned', 
+          assignedPartnerId: result.assignedPartnerId 
+        }),
+      });
+
+      if (!updateResponse.ok) {
+        const errorData = await updateResponse.json();
+        throw new Error(errorData.message || `Failed to update order ${data.orderId} status.`);
+      }
+      
       toast({
         title: "Assignment Successful",
-        description: `Order ${data.orderId} assigned to partner ${result.assignedPartnerId}.`,
+        description: `Order ${data.orderId} assigned to partner ${result.assignedPartnerId} and status updated.`,
       });
-      // TODO: Update order status in your data store
+      
+      // Optionally, refresh pending orders or navigate
+      fetchData(); // Re-fetch to update the list of pending orders
+      // router.push('/orders'); // Or navigate away
+
     } catch (error) {
-      console.error("Smart assignment failed:", error);
+      console.error("Smart assignment or order update failed:", error);
       toast({
-        title: "Assignment Failed",
-        description: (error as Error).message || "An unknown error occurred during assignment.",
+        title: "Assignment Process Failed",
+        description: (error as Error).message || "An unknown error occurred.",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (isDataLoading) {
+    return (
+      <div className="flex justify-center items-center py-10">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2">Loading assignment data...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -102,12 +186,13 @@ export function SmartAssignmentForm() {
                     <Select 
                       onValueChange={(value) => {
                         field.onChange(value);
-                        const selectedOrder = SAMPLE_ORDERS.find(o => o.id === value);
-                        if (selectedOrder) {
-                          form.setValue("orderLocation", selectedOrder.area); // Auto-fill location
+                        const currentSelectedOrder = pendingOrders.find(o => o.id === value);
+                        if (currentSelectedOrder) {
+                          form.setValue("orderLocation", currentSelectedOrder.area); 
                         }
                       }} 
-                      defaultValue={field.value}
+                      value={field.value} // Ensure value is controlled
+                      disabled={isDataLoading}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -122,7 +207,7 @@ export function SmartAssignmentForm() {
                             </SelectItem>
                           ))
                         ) : (
-                          <SelectItem value="no-orders" disabled>No pending orders</SelectItem>
+                          <SelectItem value="no-orders" disabled>No pending orders available</SelectItem>
                         )}
                       </SelectContent>
                     </Select>
@@ -137,13 +222,17 @@ export function SmartAssignmentForm() {
                   <FormItem>
                     <FormLabel>Order Location</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Downtown" {...field} />
+                      <Input placeholder="e.g., Downtown" {...field} disabled={isDataLoading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={isLoading || pendingOrders.length === 0}>
+              <Button 
+                type="submit" 
+                className="w-full" 
+                disabled={isLoading || isDataLoading || pendingOrders.length === 0 || availablePartners.length === 0}
+              >
                 {isLoading ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
@@ -151,6 +240,12 @@ export function SmartAssignmentForm() {
                 )}
                 {isLoading ? "Assigning..." : "Assign Order with AI"}
               </Button>
+              {pendingOrders.length === 0 && !isDataLoading && (
+                 <p className="text-sm text-center text-muted-foreground">No pending orders available for assignment.</p>
+              )}
+               {availablePartners.length === 0 && !isDataLoading && (
+                 <p className="text-sm text-center text-muted-foreground">No active partners available for assignment.</p>
+              )}
             </form>
           </Form>
         </CardContent>

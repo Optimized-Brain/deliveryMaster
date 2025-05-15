@@ -1,17 +1,50 @@
 
 "use client"; 
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { OrderFilters } from "@/components/orders/OrderFilters";
 import { OrderTable } from "@/components/orders/OrderTable";
-import { SAMPLE_ORDERS } from "@/lib/constants";
+// import { SAMPLE_ORDERS } from "@/lib/constants"; // Will fetch from API
 import type { Order, OrderStatus } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
+import { useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 
 export default function OrdersPage() {
   const { toast } = useToast();
-  const [allOrders] = useState<Order[]>(SAMPLE_ORDERS); 
-  const [filteredOrders, setFilteredOrders] = useState<Order[]>(allOrders);
+  const router = useRouter();
+  const [allOrders, setAllOrders] = useState<Order[]>([]); 
+  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchOrders = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/orders');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch orders');
+      }
+      const data: Order[] = await response.json();
+      setAllOrders(data);
+      setFilteredOrders(data); // Initially show all fetched orders
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+      toast({
+        title: "Error Loading Orders",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+      setAllOrders([]); // Set to empty on error
+      setFilteredOrders([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
 
   const handleFilterChange = (filters: { status?: OrderStatus | "all"; area?: string | "all"; date?: Date }) => {
     let tempOrders = allOrders;
@@ -21,7 +54,8 @@ export default function OrdersPage() {
     }
     
     if (filters.area && filters.area !== "all") {
-      tempOrders = tempOrders.filter(order => order.area.toLowerCase().includes(filters.area!.toLowerCase()));
+      // Ensure area is not undefined before calling toLowerCase
+      tempOrders = tempOrders.filter(order => order.area && filters.area && order.area.toLowerCase().includes(filters.area.toLowerCase()));
     }
     
     if (filters.date) {
@@ -34,17 +68,17 @@ export default function OrdersPage() {
 
   const handleClearFilters = () => {
     setFilteredOrders(allOrders);
-    // The OrderFilters component resets its own internal state
+    // The OrderFilters component should reset its own internal state, or we pass a reset function to it.
   }
 
   const handleViewOrder = (orderId: string) => {
     toast({ title: "View Order", description: `Viewing details for order ${orderId}` });
-    // Navigate to order detail page or show modal
+    // Future: Navigate to order detail page or show modal
   };
 
   const handleAssignOrder = (orderId: string) => {
-    toast({ title: "Assign Order", description: `Assigning partner for order ${orderId}` });
-    // Navigate to assignment page or show assignment modal
+    // Navigate to the assignment page, passing the orderId as a query parameter
+    router.push(`/assignment?orderId=${orderId}`);
   };
 
   return (
@@ -55,11 +89,19 @@ export default function OrdersPage() {
       </div>
       
       <OrderFilters onFilterChange={handleFilterChange} onClearFilters={handleClearFilters} />
-      <OrderTable 
-        orders={filteredOrders} 
-        onViewOrder={handleViewOrder} 
-        onAssignOrder={handleAssignOrder} 
-      />
+      
+      {isLoading ? (
+        <div className="flex justify-center items-center py-10">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="ml-2">Loading orders...</p>
+        </div>
+      ) : (
+        <OrderTable 
+          orders={filteredOrders} 
+          onViewOrder={handleViewOrder} 
+          onAssignOrder={handleAssignOrder} 
+        />
+      )}
     </div>
   );
 }
