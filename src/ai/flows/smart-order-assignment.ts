@@ -30,6 +30,7 @@ export type AssignOrderInput = z.infer<typeof AssignOrderInputSchema>;
 const AssignOrderOutputSchema = z.object({
   suggestionMade: z.boolean().describe('Indicates if a partner suggestion was made.'),
   suggestedPartnerName: z.string().optional().describe('The NAME of the partner suggested for the order, if a suggestion was made.'),
+  reason: z.string().optional().describe('The reason for the suggestion, or an explanation if no suitable partner was found.'),
 });
 export type AssignOrderOutput = z.infer<typeof AssignOrderOutputSchema>;
 
@@ -58,11 +59,13 @@ Based on the above information:
 2. If a suitable partner is found:
    - Set 'suggestionMade' to true.
    - Set 'suggestedPartnerName' to the NAME of that partner.
+   - Set 'reason' to a brief explanation of why this partner is a good choice (e.g., "Closest available partner with low load in the order's area.").
 3. If no suitable partner is found (e.g., no partners in the area, all eligible partners are at maximum load or unavailable):
    - Set 'suggestionMade' to false.
    - Do NOT set 'suggestedPartnerName'.
+   - Set 'reason' to a brief explanation of why no partner could be suggested (e.g., "No partners available in {{{orderLocation}}}." or "All nearby partners are at maximum load.").
 
-Return your response in JSON format. Do not provide a textual reason or explanation field in your output.`,
+Return your response in JSON format.`,
 });
 
 const assignOrderFlow = ai.defineFlow(
@@ -74,11 +77,8 @@ const assignOrderFlow = ai.defineFlow(
   async input => {
     const {output} = await assignOrderPrompt(input);
     if (output && !output.suggestionMade) {
-      delete output.suggestedPartnerName;
+      delete output.suggestedPartnerName; // Ensure partner name is not present if no suggestion made
     }
     return output!;
   }
 );
-
-
-    
