@@ -16,7 +16,7 @@ export async function GET(request: Request) {
         .select(`
           id, 
           reason, 
-          updated_at, 
+          created_at, 
           orders (
             id, 
             customer_name, 
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
           )
         `)
         .eq('status', 'failed')
-        .order('updated_at', { ascending: false });
+        .order('created_at', { ascending: false }); // Changed from updated_at to created_at
 
       if (error) {
         return NextResponse.json({ message: 'Error fetching failed assignments from Supabase.', error: error.message, details: error.details }, { status: 500 });
@@ -43,7 +43,7 @@ export async function GET(request: Request) {
             customerName: a.orders.customer_name,
             area: a.orders.area,
             failureReason: a.reason || 'No reason provided',
-            reportedAt: a.updated_at,
+            reportedAt: a.created_at, // Changed from updated_at to created_at
           };
         })
         .filter(Boolean) as FailedAssignmentInfo[]; // Filter out nulls

@@ -24,7 +24,6 @@ export interface Partner {
   registrationDate: string; // ISO string (maps to created_at from Supabase)
 }
 
-// Database constraint: status = ANY (ARRAY['pending'::text, 'assigned'::text, 'picked'::text, 'delivered'::text])
 export type OrderStatus = 'pending' | 'assigned' | 'picked' | 'delivered';
 
 export interface Order {
@@ -34,33 +33,20 @@ export interface Order {
   items: { name: string; quantity: number }[];
   status: OrderStatus;
   area: string;
-  creationDate: string; // ISO string
-  deliveryAddress: string;
-  assignedPartnerId?: string; // In Supabase: assigned_to (UUID)
-  orderValue: number; // In Supabase: total_amount
+  creationDate: string; // ISO string maps to orders.created_at
+  deliveryAddress: string; // maps to orders.customer_address
+  assignedPartnerId?: string; // maps to orders.assigned_to (UUID)
+  orderValue: number; // maps to orders.total_amount
 }
 
-export interface Metric {
-  id: string;
-  title: string;
-  value: string | number;
-  icon: LucideIcon;
-  change?: string;
-  changeType?: 'positive' | 'negative' | 'neutral';
-}
-
-// status in assignments table is 'success' or 'failed' (outcome) or 'active' (initial)
-// or NULL depending on schema for initial state.
-// The CHECK constraint in DB for assignments.status is `status = ANY (ARRAY['success'::text, 'failed'::text])`
-// And it's NOT NULL. So initial must be 'success' or 'failed'. We chose 'success'.
-export type AssignmentStatus = 'success' | 'failed';
+export type AssignmentStatus = 'success' | 'failed' | 'active' ; // 'active' for initial state
 
 export type Assignment = {
   id: string; // assignment id
   orderId: string;
   partnerId: string;
-  timestamp: string; // Supabase created_at
-  status: AssignmentStatus; // Outcome status: 'success' or 'failed'
+  timestamp: string; // Supabase created_at for the assignment record
+  status: AssignmentStatus; 
   reason?: string; // Reason for failure, if status is 'failed'
 };
 
@@ -70,7 +56,7 @@ export interface FailedAssignmentInfo {
   customerName: string;
   area: string;
   failureReason: string;
-  reportedAt: string; // Timestamp of when the failure was reported (assignments.updated_at)
+  reportedAt: string; // Timestamp of when the assignment record was created/updated (assignments.created_at or assignments.updated_at)
 }
 
 
@@ -89,4 +75,3 @@ export interface DailyOrdersChartData {
   date: string; // Format: "MMM d"
   orders: number;
 }
-
