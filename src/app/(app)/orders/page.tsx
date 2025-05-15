@@ -4,7 +4,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { OrderFilters } from "@/components/orders/OrderFilters";
 import { OrderTable } from "@/components/orders/OrderTable";
-// import { SAMPLE_ORDERS } from "@/lib/constants"; // Will fetch from API
 import type { Order, OrderStatus } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from 'next/navigation';
@@ -24,11 +23,11 @@ export default function OrdersPage() {
       if (!response.ok) {
         let errorMessage = `Failed to fetch orders (status: ${response.status})`;
         try {
-          const errorData = await response.json();
-          // Prioritize errorData.error (Supabase specific detail) then errorData.message (API level message)
+          const errorText = await response.text();
+          console.error("Raw error response from /api/orders:", errorText);
+          const errorData = JSON.parse(errorText);
           errorMessage = errorData.error || errorData.message || errorMessage;
         } catch (jsonParseError) {
-          // If parsing JSON fails, use the response status text or the default message
           errorMessage = response.statusText || errorMessage;
           console.error("Failed to parse error response from fetching orders:", jsonParseError);
         }
@@ -36,7 +35,7 @@ export default function OrdersPage() {
       }
       const data: Order[] = await response.json();
       setAllOrders(data);
-      setFilteredOrders(data); // Initially show all fetched orders
+      setFilteredOrders(data); 
     } catch (error) {
       console.error("Error fetching orders:", error);
       toast({
@@ -44,7 +43,7 @@ export default function OrdersPage() {
         description: (error as Error).message,
         variant: "destructive",
       });
-      setAllOrders([]); // Set to empty on error
+      setAllOrders([]); 
       setFilteredOrders([]);
     } finally {
       setIsLoading(false);
@@ -63,7 +62,6 @@ export default function OrdersPage() {
     }
     
     if (filters.area && filters.area !== "all") {
-      // Ensure area is not undefined before calling toLowerCase
       tempOrders = tempOrders.filter(order => order.area && filters.area && order.area.toLowerCase().includes(filters.area.toLowerCase()));
     }
     
@@ -77,16 +75,13 @@ export default function OrdersPage() {
 
   const handleClearFilters = () => {
     setFilteredOrders(allOrders);
-    // The OrderFilters component should reset its own internal state, or we pass a reset function to it.
   }
 
   const handleViewOrder = (orderId: string) => {
     toast({ title: "View Order", description: `Viewing details for order ${orderId}` });
-    // Future: Navigate to order detail page or show modal
   };
 
   const handleAssignOrder = (orderId: string) => {
-    // Navigate to the assignment page, passing the orderId as a query parameter
     router.push(`/assignment?orderId=${orderId}`);
   };
 
@@ -94,7 +89,6 @@ export default function OrdersPage() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Manage Orders</h1>
-        {/* Add New Order button can be placed here if needed */}
       </div>
       
       <OrderFilters onFilterChange={handleFilterChange} onClearFilters={handleClearFilters} />

@@ -49,34 +49,37 @@ export function SmartAssignmentForm() {
     setIsDataLoading(true);
     try {
       const [ordersResponse, partnersResponse] = await Promise.all([
-        fetch('/api/orders?status=pending'), // Fetch only pending orders
-        fetch('/api/partners?status=active') // Fetch only active partners
+        fetch('/api/orders?status=pending'), 
+        fetch('/api/partners?status=active')
       ]);
 
       if (!ordersResponse.ok) {
         let errorDetails = `Failed to fetch pending orders (status: ${ordersResponse.status})`;
         try {
-          const errorData = await ordersResponse.json();
-          if (errorData.error) { // Supabase specific error
+          const errorText = await ordersResponse.text();
+          console.error("Raw error response from /api/orders?status=pending:", errorText);
+          const errorData = JSON.parse(errorText);
+          if (errorData.error) { 
             errorDetails = `Failed to fetch pending orders: ${errorData.error}`;
           } else if (errorData.message) {
             errorDetails = errorData.message;
           }
         } catch (parseError) {
-          // Stick with the original simpler error if parsing fails
           console.error("Failed to parse error response from fetching orders:", parseError);
         }
         throw new Error(errorDetails);
       }
       const ordersData: Order[] = await ordersResponse.json();
       setPendingOrders(ordersData);
-      setAllOrders(ordersData); // Keep a copy for finding selected order details
+      setAllOrders(ordersData);
 
       if (!partnersResponse.ok) {
         let errorDetails = `Failed to fetch available partners (status: ${partnersResponse.status})`;
         try {
-          const errorData = await partnersResponse.json();
-          if (errorData.error) { // Supabase specific error
+          const errorText = await partnersResponse.text();
+          console.error("Raw error response from /api/partners?status=active:", errorText);
+          const errorData = JSON.parse(errorText);
+          if (errorData.error) { 
             errorDetails = `Failed to fetch available partners: ${errorData.error}`;
           } else if (errorData.message) {
             errorDetails = errorData.message;
@@ -89,7 +92,6 @@ export function SmartAssignmentForm() {
       const partnersData: Partner[] = await partnersResponse.json();
       setAvailablePartners(partnersData);
 
-      // Pre-fill form if orderId is in query params
       const queryOrderId = searchParams.get('orderId');
       if (queryOrderId && ordersData.some(o => o.id === queryOrderId)) {
         form.setValue('orderId', queryOrderId);
@@ -120,7 +122,7 @@ export function SmartAssignmentForm() {
     setIsLoading(true);
     setAssignmentResult(null);
 
-    const selectedOrder = allOrders.find(o => o.id === data.orderId); // Use allOrders to find details
+    const selectedOrder = allOrders.find(o => o.id === data.orderId); 
     if (!selectedOrder) {
         toast({ title: "Error", description: "Selected order not found.", variant: "destructive"});
         setIsLoading(false);
@@ -149,7 +151,6 @@ export function SmartAssignmentForm() {
       const result = await assignOrder(input);
       setAssignmentResult(result);
       
-      // Update order status in Supabase
       const updateResponse = await fetch(`/api/orders/${data.orderId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -169,9 +170,7 @@ export function SmartAssignmentForm() {
         description: `Order ${data.orderId} assigned to partner ${result.assignedPartnerId} and status updated.`,
       });
       
-      // Optionally, refresh pending orders or navigate
-      fetchData(); // Re-fetch to update the list of pending orders
-      // router.push('/orders'); // Or navigate away
+      fetchData(); 
 
     } catch (error) {
       console.error("Smart assignment or order update failed:", error);
@@ -218,7 +217,7 @@ export function SmartAssignmentForm() {
                           form.setValue("orderLocation", currentSelectedOrder.area); 
                         }
                       }} 
-                      value={field.value} // Ensure value is controlled
+                      value={field.value}
                       disabled={isDataLoading}
                     >
                       <FormControl>
