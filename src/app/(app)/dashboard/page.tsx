@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
+import type { Response } from 'node-fetch'; // Import Response type for explicit typing
 import { MetricsGrid } from "@/components/dashboard/MetricsGrid";
 import { RecentActivityChart } from "@/components/dashboard/RecentActivityChart";
 import { FailedAssignmentsList } from "@/components/dashboard/FailedAssignmentsList";
@@ -29,8 +30,12 @@ export default function DashboardPage() {
     // Always set assignment metrics loading for its specific card, even on poll
     setIsAssignmentMetricsLoading(true);
 
+    let ordersResponse: globalThis.Response | undefined;
+    let pendingOrdersResponse: globalThis.Response | undefined;
+    let assignmentMetricsResponse: globalThis.Response | undefined;
+
     try {
-      const [ordersResponse, pendingOrdersResponse, assignmentMetricsResponse] = await Promise.all([
+      [ordersResponse, pendingOrdersResponse, assignmentMetricsResponse] = await Promise.all([
         fetch('/api/orders'), 
         fetch('/api/orders?status=pending'),
         fetch('/api/assignments/metrics')
@@ -41,14 +46,14 @@ export default function DashboardPage() {
       let fetchedPendingOrders: Order[] = [];
 
       if (!ordersResponse.ok) {
-        const errorData = await ordersResponse.json().catch(() => ({ message: `Failed to fetch all orders (status: ${ordersResponse.status})` }));
+        const errorData = await ordersResponse.json().catch(() => ({ message: `Failed to fetch all orders (status: ${ordersResponse?.status})` }));
         throw new Error(errorData.message || `Failed to fetch all orders`);
       }
       fetchedOrders = await ordersResponse.json();
       setAllOrders(fetchedOrders);
 
       if (!pendingOrdersResponse.ok) {
-        const errorData = await pendingOrdersResponse.json().catch(() => ({ message: `Failed to fetch pending orders (status: ${pendingOrdersResponse.status})` }));
+        const errorData = await pendingOrdersResponse.json().catch(() => ({ message: `Failed to fetch pending orders (status: ${pendingOrdersResponse?.status})` }));
         throw new Error(errorData.message || `Failed to fetch pending orders`);
       }
       fetchedPendingOrders = await pendingOrdersResponse.json();
@@ -56,13 +61,9 @@ export default function DashboardPage() {
       // Process Assignment Metrics
       let fetchedAssignmentMetricsData: AssignmentMetrics | null = null;
       if (!assignmentMetricsResponse.ok) {
-        const errorData = await assignmentMetricsResponse.json().catch(() => ({ message: `Failed to fetch assignment metrics (status: ${assignmentMetricsResponse.status})` }));
-        // For polling, we might log this error but not throw, to allow other metrics to update
-        // For initial load, we throw.
+        const errorData = await assignmentMetricsResponse.json().catch(() => ({ message: `Failed to fetch assignment metrics (status: ${assignmentMetricsResponse?.status})` }));
         if (!isPollingUpdate) throw new Error(errorData.message || `Failed to fetch assignment metrics`);
-        console.error("Polling error fetching assignment metrics:", errorData.message || `Status: ${assignmentMetricsResponse.status}`);
-        // Keep existing assignmentMetrics or set to error state if desired for the card
-        // For simplicity, we'll let it try to update metrics below, which will use potentially stale data for assignment parts.
+        console.error("Polling error fetching assignment metrics:", errorData.message || `Status: ${assignmentMetricsResponse?.status}`);
       } else {
         fetchedAssignmentMetricsData = await assignmentMetricsResponse.json();
         setAssignmentMetrics(fetchedAssignmentMetricsData);
@@ -79,7 +80,7 @@ export default function DashboardPage() {
       setMetrics(prevMetrics => {
         return DASHBOARD_METRICS_CONFIG.map(config => {
           const existingMetric = prevMetrics.find(pm => pm.id === config.id);
-          let value: string | number = existingMetric?.value ?? "..."; // Default to existing or placeholder
+          let value: string | number = existingMetric?.value ?? "..."; 
 
           if (config.id === 'metric-total-orders') value = totalOrders;
           else if (config.id === 'metric-pending-orders') value = pendingOrdersCount;
@@ -87,7 +88,7 @@ export default function DashboardPage() {
           else if (config.id === 'metric-avg-order-value') value = `₹${avgOrderValue.toFixed(2)}`;
           else if (config.id === 'metric-total-assignments' && fetchedAssignmentMetricsData) value = fetchedAssignmentMetricsData.totalAssignments;
           else if (config.id === 'metric-assignment-success-rate' && fetchedAssignmentMetricsData) value = `${fetchedAssignmentMetricsData.successRate.toFixed(1)}%`;
-          else if (value === "...") value = "N/A"; // If still placeholder, set to N/A
+          else if (value === "...") value = "N/A";
 
           return { ...config, value, change: existingMetric?.change || "", changeType: existingMetric?.changeType || "neutral" };
         });
@@ -102,31 +103,29 @@ export default function DashboardPage() {
           variant: "destructive",
         });
         setMetrics(DASHBOARD_METRICS_CONFIG.map(m => ({ ...m, value: "Error", change: "", changeType: "negative" })));
-        setAssignmentMetrics(null); // Clear assignment metrics on initial load error
-        setIsAssignmentMetricsLoading(false); // Ensure this loader stops on error too
+        setAssignmentMetrics(null); 
+        setIsAssignmentMetricsLoading(false); 
       }
-      // For polling errors, we generally just log and don't show a toast or clear data
-      // to avoid interrupting the user.
     } finally {
       if (!isPollingUpdate) {
         setIsLoading(false);
       }
       // If there was an error specific to assignment metrics and it wasn't an initial load,
-      // the loader might still be on. Ensure it's off.
-      if (isAssignmentMetricsLoading && !assignmentMetricsResponse.ok) {
+      // or if the assignmentMetricsResponse was defined but not .ok, ensure loader is off.
+      if (isAssignmentMetricsLoading && (!assignmentMetricsResponse || !assignmentMetricsResponse.ok)) {
         setIsAssignmentMetricsLoading(false);
       }
     }
-  }, [toast]); // Removed assignmentMetricsResponse from deps to avoid complex conditions in finally
+  }, [toast]); 
 
   useEffect(() => {
-    fetchDashboardData(); // Initial fetch
+    fetchDashboardData(); 
 
     const intervalId = setInterval(() => {
-      fetchDashboardData(true); // Subsequent fetches are polling updates
+      fetchDashboardData(true); 
     }, POLLING_INTERVAL);
 
-    return () => clearInterval(intervalId); // Cleanup interval on component unmount
+    return () => clearInterval(intervalId); 
   }, [fetchDashboardData]);
 
   return (
@@ -186,7 +185,7 @@ export default function DashboardPage() {
             <CardDescription>Common reasons for reported assignment issues.</CardDescription>
           </CardHeader>
           <CardContent>
-            {isAssignmentMetricsLoading && !assignmentMetrics ? ( // Show loader if loading AND no data yet
+            {isAssignmentMetricsLoading && !assignmentMetrics ? ( 
               <div className="flex items-center justify-center h-40">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 <p className="ml-2 text-muted-foreground">Loading failure reasons...</p>
@@ -204,7 +203,7 @@ export default function DashboardPage() {
                   ))}
                 </ul>
               </ScrollArea>
-            ) : ( // This covers case where metrics are loaded but no failure reasons exist, OR if error occurred during fetch
+            ) : ( 
               <div className="flex flex-col items-center justify-center h-40 text-center">
                  <ListChecks className="h-12 w-12 text-emerald-500 mb-3" />
                 <p className="text-muted-foreground">
