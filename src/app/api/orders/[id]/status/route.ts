@@ -27,10 +27,10 @@ export async function PUT(request: Request, context: { params: Params }) {
     const orderUpdateData: { status: OrderStatus; assigned_to?: string | null } = { status: newOrderStatus as OrderStatus };
     if (assignedPartnerId && newOrderStatus === 'assigned') {
       orderUpdateData.assigned_to = assignedPartnerId;
-    } else if (newOrderStatus === 'pending') { 
-      orderUpdateData.assigned_to = null; 
+    } else if (newOrderStatus === 'pending') {
+      orderUpdateData.assigned_to = null;
     }
-    
+
     const { data: updatedOrderData, error: orderUpdateError } = await supabase
       .from('orders')
       .update(orderUpdateData)
@@ -39,7 +39,7 @@ export async function PUT(request: Request, context: { params: Params }) {
       .single();
 
     if (orderUpdateError) {
-      if (orderUpdateError.code === 'PGRST116') { 
+      if (orderUpdateError.code === 'PGRST116') {
         return NextResponse.json({ message: `Order with ID ${orderId} not found.` }, { status: 404 });
       }
       return NextResponse.json({ message: `Order update failed: ${orderUpdateError.message || 'Unknown Supabase error while updating order'}` }, { status: 500 });
@@ -49,48 +49,53 @@ export async function PUT(request: Request, context: { params: Params }) {
       return NextResponse.json({ message: `Order with ID ${orderId} not found after update attempt.` }, { status: 404 });
     }
 
-    let partnerLoadUpdatedSuccessfully = true;
+    let partnerLoadUpdateMessage = "";
     let assignmentLoggedSuccessfully = true;
     let assignmentLogError = "";
-    let partnerLoadUpdateError = "";
+
 
     if (newOrderStatus === 'assigned' && assignedPartnerId) {
       // Create base assignment record
+      // The `status` and `reason` fields in the `assignments` table
+      // are intended for later updates (e.g., by an admin after delivery outcome).
+      // The database `CHECK (status IN ('success', 'failed'))` and potential `NOT NULL`
+      // constraint on `status` mean we cannot set an intermediate system status here.
+      // This insert will rely on the database schema:
+      // - If `assignments.status` is nullable, it will be NULL.
+      // - If `assignments.status` is NOT NULL and has a DEFAULT, that default will be used.
+      // - If `assignments.status` is NOT NULL and has NO DEFAULT, this insert will fail,
+      //   which is the correct behavior as the application cannot satisfy the constraint.
       const assignmentLogData = {
         order_id: orderId,
         partner_id: assignedPartnerId,
-        status: 'active', // Using 'active' as a placeholder for an initial assignment status.
-                           // Ensure 'active' is allowed by your 'assignments_status_check' constraint
-                           // and that the 'status' column in 'assignments' is NOT NULL.
+        // DO NOT set `status` here if it's constrained to 'success'/'failed'
+        // and the outcome isn't known yet.
       };
-      
+
       const { data: assignmentData, error: assignmentInsertError } = await supabase
         .from('assignments')
         .insert(assignmentLogData)
-        .select('id') 
-        .single(); 
+        .select('id')
+        .single();
 
       if (assignmentInsertError) {
         assignmentLoggedSuccessfully = false;
         assignmentLogError = `Failed to create assignment record: ${assignmentInsertError.message}. This is a critical issue. Supabase Code: ${assignmentInsertError.code}`;
-        // This is a critical failure, so return a 500 error.
-        return NextResponse.json({ 
-          message: `Order status updated to '${newOrderStatus}', but FAILED to log assignment record. Please check server logs for details. Supabase: ${assignmentLogError}`, 
-          error: assignmentLogError 
+        return NextResponse.json({
+          message: `Order status updated to '${newOrderStatus}', but FAILED to log assignment record. Please check server logs for details. Supabase: ${assignmentLogError}`,
+          error: assignmentLogError
         }, { status: 500 });
       }
-      
-      if (!assignmentData && assignmentLoggedSuccessfully) { 
-          // This case should ideally not happen if insert was successful and no error was thrown,
-          // but as a safeguard:
-          assignmentLoggedSuccessfully = false; 
+
+      if (!assignmentData && assignmentLoggedSuccessfully) {
+          assignmentLoggedSuccessfully = false;
           assignmentLogError = 'Failed to confirm assignment record creation (no data returned after insert despite no error). This is a critical issue.';
           return NextResponse.json({
               message: `Order status updated to '${newOrderStatus}', but FAILED to confirm assignment record creation. Please check server logs.`,
               error: assignmentLogError
           }, { status: 500 });
       }
-      
+
       // Attempt to update partner load (auxiliary task)
       try {
         const { data: partnerData, error: partnerFetchError } = await supabase
@@ -100,11 +105,9 @@ export async function PUT(request: Request, context: { params: Params }) {
           .single();
 
         if (partnerFetchError) {
-          partnerLoadUpdatedSuccessfully = false;
-          partnerLoadUpdateError = `Failed to fetch partner ${assignedPartnerId} for load update: ${partnerFetchError.message}`;
+          partnerLoadUpdateMessage = `Warning: Failed to fetch partner ${assignedPartnerId} for load update: ${partnerFetchError.message}.`;
         } else if (!partnerData) {
-          partnerLoadUpdatedSuccessfully = false;
-          partnerLoadUpdateError = `Partner ${assignedPartnerId} not found for load update.`;
+          partnerLoadUpdateMessage = `Warning: Partner ${assignedPartnerId} not found for load update.`;
         } else {
           const newLoad = (partnerData.current_load || 0) + 1;
           const { error: partnerUpdateError } = await supabase
@@ -113,13 +116,13 @@ export async function PUT(request: Request, context: { params: Params }) {
             .eq('id', assignedPartnerId);
 
           if (partnerUpdateError) {
-            partnerLoadUpdatedSuccessfully = false;
-            partnerLoadUpdateError = `Failed to update partner ${assignedPartnerId} load: ${partnerUpdateError.message}`;
+            partnerLoadUpdateMessage = `Warning: Failed to update partner ${assignedPartnerId} load: ${partnerUpdateError.message}`;
+          } else {
+            partnerLoadUpdateMessage = `Partner ${assignedPartnerId.substring(0,8)}... load incremented.`;
           }
         }
       } catch (e) {
-          partnerLoadUpdatedSuccessfully = false;
-          partnerLoadUpdateError = `Unexpected error during partner load update: ${(e as Error).message}`;
+          partnerLoadUpdateMessage = `Warning: Unexpected error during partner load update: ${(e as Error).message}`;
       }
     }
 
@@ -130,19 +133,19 @@ export async function PUT(request: Request, context: { params: Params }) {
       items: updatedOrderData.items || [],
       status: updatedOrderData.status as OrderStatus,
       area: updatedOrderData.area,
-      creationDate: updatedOrderData.created_at, 
-      deliveryAddress: updatedOrderData.customer_address, 
-      assignedPartnerId: updatedOrderData.assigned_to, 
-      orderValue: updatedOrderData.total_amount, 
+      creationDate: updatedOrderData.created_at,
+      deliveryAddress: updatedOrderData.customer_address,
+      assignedPartnerId: updatedOrderData.assigned_to,
+      orderValue: updatedOrderData.total_amount,
     };
-    
+
     let successMessage = `Status for order ${orderId.substring(0,8)}... updated successfully to ${newOrderStatus}.`;
     if (newOrderStatus === 'assigned' && assignedPartnerId) {
-        if (assignmentLoggedSuccessfully) { // This will be true if we haven't errored out before this point
+        if (assignmentLoggedSuccessfully) {
             successMessage += ` Assignment logged successfully.`;
         }
-        if (!partnerLoadUpdatedSuccessfully) {
-            successMessage += ` WARNING: Partner load update failed: ${partnerLoadUpdateError}. Please check server logs.`;
+        if (partnerLoadUpdateMessage) { // Append warning if partner load update had issues
+            successMessage += ` ${partnerLoadUpdateMessage}`;
         }
     }
 
