@@ -134,7 +134,7 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                 <TableHead onClick={() => handleSort('currentLoad')} className="cursor-pointer hover:bg-muted/50 text-center">
                   Load {renderSortIcon('currentLoad')}
                 </TableHead>
-                <TableHead>Assigned Orders</TableHead> {/* New Column */}
+                <TableHead>Assigned Orders</TableHead>
                 <TableHead onClick={() => handleSort('rating')} className="cursor-pointer hover:bg-muted/50 text-center">
                   Rating {renderSortIcon('rating')}
                 </TableHead>
@@ -162,7 +162,7 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                     {partner.assignedAreas.join(', ')}
                   </TableCell>
                   <TableCell className="text-center">{partner.currentLoad}</TableCell>
-                  <TableCell className="text-center"> {/* New Cell */}
+                  <TableCell className="text-center">
                     <Button variant="link" size="sm" asChild className="p-0 h-auto">
                       <Link href={`/orders?assignedPartnerId=${partner.id}`}>
                         View ({partner.currentLoad}) <ListOrdered className="ml-1 h-3.5 w-3.5" />
