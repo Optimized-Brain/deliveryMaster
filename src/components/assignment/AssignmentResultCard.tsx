@@ -1,7 +1,7 @@
 
 import type { AssignOrderOutput } from "@/ai/flows/smart-order-assignment";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Lightbulb, Info, AlertTriangle } from "lucide-react";
+import { Lightbulb, AlertTriangle } from "lucide-react";
 
 interface AssignmentResultCardProps {
   suggestion: AssignOrderOutput;
@@ -16,7 +16,7 @@ export function AssignmentResultCard({ suggestion }: AssignmentResultCardProps) 
           <CardTitle className="text-xl">{suggestion.suggestionMade ? 'AI Suggestion' : 'AI Analysis'}</CardTitle>
         </div>
         <CardDescription className={`${suggestion.suggestionMade ? 'text-blue-600' : 'text-amber-600'}`}>
-          {suggestion.suggestionMade ? "Here's what our AI recommends for this order:" : "AI Analysis Results:"}
+          {suggestion.suggestionMade ? "AI recommends the following partner:" : "AI could not identify a suitable partner based on current criteria."}
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-6 space-y-3">
@@ -26,13 +26,12 @@ export function AssignmentResultCard({ suggestion }: AssignmentResultCardProps) 
             <p className="text-lg font-semibold">{suggestion.suggestedPartnerId}</p>
           </div>
         )}
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">{suggestion.suggestionMade ? "AI's Reasoning" : "AI's Explanation"}</p>
-          <div className="flex items-start gap-2 mt-1 p-3 bg-secondary rounded-md">
-            <Info className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-            <p className="text-sm">{suggestion.reason}</p>
+        {!suggestion.suggestionMade && (
+           <div>
+            <p className="text-sm font-medium text-muted-foreground">Details</p>
+            <p className="text-sm">The AI was unable to find a suitable partner. Please review available partners and assign manually if appropriate.</p>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

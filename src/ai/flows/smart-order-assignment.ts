@@ -3,7 +3,7 @@
 /**
  * @fileOverview This file defines a Genkit flow for smart order assignment suggestions to delivery partners.
  *
- * - assignOrder - Suggests the most suitable delivery partner based on location, load, and area, or explains why no suggestion can be made.
+ * - assignOrder - Suggests the most suitable delivery partner based on location, load, and area, or indicates why no suggestion can be made.
  * - AssignOrderInput - The input type for the assignOrder function.
  * - AssignOrderOutput - The return type for the assignOrder function.
  */
@@ -29,7 +29,7 @@ export type AssignOrderInput = z.infer<typeof AssignOrderInputSchema>;
 const AssignOrderOutputSchema = z.object({
   suggestionMade: z.boolean().describe('Indicates if a partner suggestion was made.'),
   suggestedPartnerId: z.string().optional().describe('The ID of the partner suggested for the order, if a suggestion was made.'),
-  reason: z.string().describe('The reason for suggesting a specific partner, or an explanation if no suitable partner was found.'),
+  // Reason field removed as per user request for AI to be just a helper
 });
 export type AssignOrderOutput = z.infer<typeof AssignOrderOutputSchema>;
 
@@ -41,7 +41,7 @@ const assignOrderPrompt = ai.definePrompt({
   name: 'assignOrderSuggestionPrompt',
   input: {schema: AssignOrderInputSchema},
   output: {schema: AssignOrderOutputSchema},
-  prompt: `You are an expert delivery dispatch advisor. Given an order and a list of available delivery partners, suggest the best partner to assign the order to.
+  prompt: `You are an expert delivery dispatch advisor. Given an order and a list of available delivery partners, suggest the best partner to assign the order to, or indicate if no suitable partner is found.
 
 Consider the partner's location relative to the order, current load, assigned areas, and availability. Your goal is to suggest a partner that would minimize delivery time and optimize partner utilization.
 
@@ -58,13 +58,11 @@ Based on the above information:
 2. If a suitable partner is found:
    - Set 'suggestionMade' to true.
    - Set 'suggestedPartnerId' to the ID of that partner.
-   - Provide a clear 'reason' explaining why this partner is the best choice. This reason will be shown to the user.
 3. If no suitable partner is found (e.g., no partners in the area, all eligible partners are at maximum load or unavailable):
    - Set 'suggestionMade' to false.
    - Do NOT set 'suggestedPartnerId'.
-   - Provide a clear, user-visible 'reason' explaining in detail why no suitable partner could be identified. This reason will be shown directly to the user. For example: "No partners are currently available in the '{{{orderLocation}}}' area," or "All potentially suitable partners in '{{{orderLocation}}}' are at maximum load or otherwise unavailable."
 
-Return your response in JSON format.`,
+Return your response in JSON format. Do not provide a textual reason or explanation field in your output.`,
 });
 
 const assignOrderFlow = ai.defineFlow(
@@ -82,4 +80,3 @@ const assignOrderFlow = ai.defineFlow(
     return output!;
   }
 );
-
