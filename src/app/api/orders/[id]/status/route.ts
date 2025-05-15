@@ -14,6 +14,7 @@ async function updatePartnerMetrics(
     | { type: 'decrement_load_and_increment_completed' }
     | { type: 'decrement_load_and_increment_cancelled' }
 ) {
+  console.log(`[API updatePartnerMetrics] Updating metrics for partner ${partnerId} with action:`, metricAction.type);
   const { data: partner, error: fetchError } = await supabase
     .from('delivery_partners')
     .select('current_load, completed_orders, cancelled_orders')
@@ -22,12 +23,14 @@ async function updatePartnerMetrics(
 
   if (fetchError) {
     console.error(`[API updatePartnerMetrics] Failed to fetch partner ${partnerId}:`, { code: fetchError.code, message: fetchError.message, details: fetchError.details });
-    return { success: false, message: `Failed to fetch partner ${partnerId} for metric update.` };
+    return { success: false, message: `Failed to fetch partner ${partnerId} for metric update. Supabase: ${fetchError.message}` };
   }
   if (!partner) {
     console.error(`[API updatePartnerMetrics] Partner ${partnerId} not found.`);
     return { success: false, message: `Partner ${partnerId} not found for metric update.` };
   }
+  console.log(`[API updatePartnerMetrics] Current metrics for partner ${partnerId}:`, partner);
+
 
   const updatePayload: Partial<Pick<Partner, 'current_load' | 'completed_orders' | 'cancelled_orders'>> = {};
   let actionDescription = "";
@@ -48,8 +51,10 @@ async function updatePartnerMetrics(
       actionDescription = "load decremented, cancelled_orders incremented";
       break;
   }
+  console.log(`[API updatePartnerMetrics] Calculated update payload for partner ${partnerId}:`, updatePayload);
 
   if (Object.keys(updatePayload).length === 0) {
+    console.log(`[API updatePartnerMetrics] No metric changes required for partner ${partnerId}.`);
     return { success: true, message: 'No metric changes required for partner.' };
   }
 
@@ -60,8 +65,9 @@ async function updatePartnerMetrics(
 
   if (updateError) {
     console.error(`[API updatePartnerMetrics] Failed to update partner ${partnerId} metrics (${actionDescription}):`, { code: updateError.code, message: updateError.message, details: updateError.details });
-    return { success: false, message: `Failed to update partner ${partnerId.substring(0,8)}... metrics (${actionDescription}). Check server logs.` };
+    return { success: false, message: `Failed to update partner ${partnerId.substring(0,8)}... metrics (${actionDescription}). Supabase: ${updateError.message}` };
   }
+  console.log(`[API updatePartnerMetrics] Successfully updated metrics for partner ${partnerId} (${actionDescription}).`);
   return { success: true, message: `Partner ${partnerId.substring(0,8)}... metrics updated (${actionDescription}).` };
 }
 
@@ -69,14 +75,18 @@ async function updatePartnerMetrics(
 // PUT /api/orders/[id]/status
 export async function PUT(request: Request, context: { params: Params }) {
   const { id: orderId } = context.params;
+  console.log(`[API PUT /api/orders/${orderId}/status] Received request.`);
   let requestBody;
   try {
     requestBody = await request.json();
   } catch (e) {
+    console.error(`[API PUT /api/orders/${orderId}/status] Invalid JSON body:`, e);
     return NextResponse.json({ message: 'Invalid request body: Malformed JSON.', error: (e as Error).message }, { status: 400 });
   }
 
   const { status: newOrderStatus, assignedPartnerId } = requestBody;
+  console.log(`[API PUT /api/orders/${orderId}/status] Request body parsed: newStatus=${newOrderStatus}, assignedPartnerId=${assignedPartnerId}`);
+
 
   if (!newOrderStatus) {
     return NextResponse.json({ message: 'New status is required in the request body.' }, { status: 400 });
@@ -89,6 +99,7 @@ export async function PUT(request: Request, context: { params: Params }) {
 
   let originalAssignedPartnerId: string | null = null;
 
+  // Fetch current order details to get originalAssignedPartnerId
   const { data: currentOrderData, error: fetchCurrentOrderError } = await supabase
       .from('orders')
       .select('assigned_to, status')
@@ -97,25 +108,28 @@ export async function PUT(request: Request, context: { params: Params }) {
 
   if (fetchCurrentOrderError) {
       console.error(`[API PUT /api/orders/${orderId}/status] Error fetching current order details:`, { code: fetchCurrentOrderError.code, message: fetchCurrentOrderError.message, details: fetchCurrentOrderError.details });
-      if (fetchCurrentOrderError.code === 'PGRST116') {
+      if (fetchCurrentOrderError.code === 'PGRST116') { // "Actual num rows 0 differs from expected 1"
           return NextResponse.json({ message: `Order with ID ${orderId} not found.` }, { status: 404 });
       }
-      return NextResponse.json({ message: `Database error fetching current order details. Check server logs.` }, { status: 500 });
+      return NextResponse.json({ message: `Database error fetching current order details. Supabase: ${fetchCurrentOrderError.message}` }, { status: 500 });
   }
-  if (currentOrderData) {
-      originalAssignedPartnerId = currentOrderData.assigned_to;
-  } else {
+  if (!currentOrderData) { // Should be caught by PGRST116, but as a fallback
       return NextResponse.json({ message: `Order with ID ${orderId} not found (no data returned).` }, { status: 404 });
   }
+  originalAssignedPartnerId = currentOrderData.assigned_to;
+  console.log(`[API PUT /api/orders/${orderId}/status] Current order details: originalAssignedPartnerId=${originalAssignedPartnerId}, currentStatus=${currentOrderData.status}`);
 
-  // Update Order
+  // Prepare order update data
   const orderUpdateData: Record<string, any> = { status: newOrderStatus as OrderStatus };
   if (newOrderStatus === 'assigned' && assignedPartnerId) {
     orderUpdateData.assigned_to = assignedPartnerId;
   } else if (newOrderStatus === 'pending' || newOrderStatus === 'cancelled') {
     orderUpdateData.assigned_to = null; 
   }
+  console.log(`[API PUT /api/orders/${orderId}/status] Order update payload:`, orderUpdateData);
 
+
+  // Update Order in database
   const { data: updatedOrderData, error: orderUpdateError } = await supabase
     .from('orders')
     .update(orderUpdateData)
@@ -129,16 +143,20 @@ export async function PUT(request: Request, context: { params: Params }) {
       return NextResponse.json({ message: `Order with ID ${orderId} not found during update.` }, { status: 404 });
     }
     return NextResponse.json({
-      message: `Order update failed. Check server logs.`,
+      message: `Order update failed. Supabase: ${orderUpdateError.message}`,
       error: `Supabase Code: ${orderUpdateError.code}`
     }, { status: 500 });
   }
-  if (!updatedOrderData) {
+  if (!updatedOrderData) { // Should be caught by PGRST116, but as a fallback
     return NextResponse.json({ message: `Order with ID ${orderId} not found after update attempt.` }, { status: 404 });
   }
+  console.log(`[API PUT /api/orders/${orderId}/status] Order ${orderId} successfully updated in 'orders' table.`);
   
   // Handle assignments table and partner metrics
+  let partnerMetricsMessage = "";
+
   if (newOrderStatus === 'assigned' && assignedPartnerId) {
+    console.log(`[API PUT /api/orders/${orderId}/status] Order assigned to partner ${assignedPartnerId}. Logging assignment and updating partner load.`);
     const assignmentLogData = {
       order_id: orderId,
       partner_id: assignedPartnerId,
@@ -152,19 +170,25 @@ export async function PUT(request: Request, context: { params: Params }) {
 
     if (assignmentInsertError || !assignmentData) {
       console.error(`[API PUT /api/orders/${orderId}/status] FAILED to create assignment record:`, assignmentInsertError ? { code: assignmentInsertError.code, message: assignmentInsertError.message, details: assignmentInsertError.details } : 'No data returned after insert.');
-      return NextResponse.json({ message: `Order status updated, but FAILED to log assignment record. Please check server logs for details. Supabase Code: ${assignmentInsertError?.code}`, error: assignmentInsertError?.message }, { status: 500 });
+      // This is a critical failure for the assignment process.
+      return NextResponse.json({ message: `Order status updated, but FAILED to log assignment record. This is a critical issue. Supabase Code: ${assignmentInsertError?.code}`, error: assignmentInsertError?.message }, { status: 500 });
     }
+    console.log(`[API PUT /api/orders/${orderId}/status] Successfully created assignment record ${assignmentData.id}.`);
     
     const partnerLoadResult = await updatePartnerMetrics(assignedPartnerId, { type: 'increment_load' });
     if (!partnerLoadResult.success) {
-        return NextResponse.json({ message: `Order assigned and logged, but partner metric update failed: ${partnerLoadResult.message}`, error: partnerLoadResult.message }, { status: 500 });
+        // Critical failure if partner load cannot be incremented
+        return NextResponse.json({ message: `Order assigned and logged, but critical partner metric update (load increment) failed: ${partnerLoadResult.message}`, error: partnerLoadResult.message }, { status: 500 });
     }
+    partnerMetricsMessage = partnerLoadResult.message;
 
   } else if (newOrderStatus === 'delivered' && originalAssignedPartnerId) {
+    console.log(`[API PUT /api/orders/${orderId}/status] Order delivered by partner ${originalAssignedPartnerId}. Updating partner metrics.`);
     const partnerMetricsResult = await updatePartnerMetrics(originalAssignedPartnerId, { type: 'decrement_load_and_increment_completed' });
     if (!partnerMetricsResult.success) {
-        return NextResponse.json({ message: `Order marked delivered, but partner metric update failed: ${partnerMetricsResult.message}`, error: partnerMetricsResult.message }, { status: 500 });
+        return NextResponse.json({ message: `Order marked delivered, but critical partner metric update failed: ${partnerMetricsResult.message}`, error: partnerMetricsResult.message }, { status: 500 });
     }
+    partnerMetricsMessage = partnerMetricsResult.message;
     
     const { error: updateAssignmentError } = await supabase
       .from('assignments')
@@ -176,15 +200,17 @@ export async function PUT(request: Request, context: { params: Params }) {
 
     if (updateAssignmentError) {
       console.warn(`[API PUT /api/orders/${orderId}/status] Warning: Failed to update assignment record to success:`, { code: updateAssignmentError.code, message: updateAssignmentError.message, details: updateAssignmentError.details });
-      // Non-critical, proceed but warn
+      // Non-critical for this flow, but good to note
     }
 
-  } else if (newOrderStatus === 'cancelled') { // Explicitly handle cancelled
+  } else if (newOrderStatus === 'cancelled') { 
+    console.log(`[API PUT /api/orders/${orderId}/status] Order cancelled. Updating partner metrics and assignment if applicable.`);
     if (originalAssignedPartnerId) {
       const partnerMetricsResult = await updatePartnerMetrics(originalAssignedPartnerId, { type: 'decrement_load_and_increment_cancelled' });
       if (!partnerMetricsResult.success) {
-          return NextResponse.json({ message: `Order marked cancelled, but partner metric update failed: ${partnerMetricsResult.message}`, error: partnerMetricsResult.message }, { status: 500 });
+          return NextResponse.json({ message: `Order marked cancelled, but critical partner metric update failed: ${partnerMetricsResult.message}`, error: partnerMetricsResult.message }, { status: 500 });
       }
+      partnerMetricsMessage = partnerMetricsResult.message;
 
       const { error: updateAssignmentError } = await supabase
         .from('assignments')
@@ -195,8 +221,9 @@ export async function PUT(request: Request, context: { params: Params }) {
         .limit(1); 
       if (updateAssignmentError) {
         console.warn(`[API PUT /api/orders/${orderId}/status] Warning: Failed to update assignment record to failed (cancelled):`, { code: updateAssignmentError.code, message: updateAssignmentError.message, details: updateAssignmentError.details });
-        // Non-critical, proceed but warn
       }
+    } else {
+        partnerMetricsMessage = "No partner was assigned to this cancelled order."
     }
   }
 
@@ -214,8 +241,14 @@ export async function PUT(request: Request, context: { params: Params }) {
     orderValue: Number(updatedOrderData.total_amount) || 0,
   };
 
+  let finalMessage = `Status for order ${orderId.substring(0,8)}... updated successfully to ${newOrderStatus}.`;
+  if (partnerMetricsMessage) {
+    finalMessage += ` ${partnerMetricsMessage}`;
+  }
+
+  console.log(`[API PUT /api/orders/${orderId}/status] Successfully processed request. Sending response: ${finalMessage}`);
   return NextResponse.json({
-    message: `Status for order ${orderId.substring(0,8)}... updated successfully to ${newOrderStatus}.`,
+    message: finalMessage,
     updatedOrder: finalUpdatedOrder
   });
 }

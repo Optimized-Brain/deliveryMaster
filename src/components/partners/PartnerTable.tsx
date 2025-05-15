@@ -33,7 +33,7 @@ function AssignedOrdersPopoverContent({
   deliveredOrders,
   cancelledOrders,
 }: AssignedOrdersPopoverContentProps) {
-  console.log(`[AssignedOrdersPopoverContent] Rendering for ${partnerName}. Active: ${activeOrders.length}, Delivered: ${deliveredOrders.length}, Cancelled: ${cancelledOrders.length}`);
+  // console.log(`[AssignedOrdersPopoverContent] Rendering for ${partnerName}. Active: ${activeOrders.length}, Delivered: ${deliveredOrders.length}, Cancelled: ${cancelledOrders.length}`);
 
   if (activeOrders.length === 0 && deliveredOrders.length === 0 && cancelledOrders.length === 0) {
     return <div className="p-4 text-muted-foreground text-sm">No orders found for {partnerName}.</div>;
@@ -128,10 +128,10 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
 
 
   const fetchOrdersForPartner = useCallback(async (partnerId: string, partnerName: string) => {
-    console.log(`[PartnerTable] fetchOrdersForPartner: Fetching for partner ID ${partnerId} (${partnerName})`);
+    console.log(`[PartnerTable] fetchOrdersForPartner: Fetching orders for partner ID ${partnerId} (${partnerName})`);
     setPartnerOrderData(prev => ({
       ...prev,
-      [partnerId]: { ...(prev[partnerId] || { active: [], delivered: [], cancelled: [] }), isLoading: true, error: null }
+      [partnerId]: { ...(prev[partnerId] || { active: [], delivered: [], cancelled: [], isLoading: true, error: null }), isLoading: true, error: null }
     }));
     try {
       const response = await fetch(`/api/orders?assignedPartnerId=${partnerId}`);
@@ -145,13 +145,13 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
         throw new Error(message);
       }
       const orders: Order[] = await response.json();
-      console.log(`[PartnerTable] fetchOrdersForPartner: Received ${orders.length} orders for partner ${partnerId}`);
+      console.log(`[PartnerTable] fetchOrdersForPartner: Received ${orders.length} raw orders for partner ${partnerId}:`, orders);
 
       const active = orders.filter(o => o.status === 'assigned' || o.status === 'picked');
       const delivered = orders.filter(o => o.status === 'delivered');
       const cancelled = orders.filter(o => o.status === 'cancelled');
       
-      console.log(`[PartnerTable] fetchOrdersForPartner: Partner ${partnerId} - Active: ${active.length}, Delivered: ${delivered.length}, Cancelled: ${cancelled.length}`);
+      console.log(`[PartnerTable] fetchOrdersForPartner: Partner ${partnerId} - Categorized counts - Active: ${active.length}, Delivered: ${delivered.length}, Cancelled: ${cancelled.length}`);
 
       setPartnerOrderData(prev => ({
         ...prev,
@@ -162,7 +162,7 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
       console.error(`[PartnerTable] fetchOrdersForPartner: Error fetching orders for partner ${partnerId}:`, errorMessage);
       setPartnerOrderData(prev => ({
         ...prev,
-        [partnerId]: { ...(prev[partnerId] || { active: [], delivered: [], cancelled: [] }), isLoading: false, error: errorMessage }
+        [partnerId]: { ...(prev[partnerId] || { active: [], delivered: [], cancelled: [], isLoading: false, error: null }), isLoading: false, error: errorMessage }
       }));
        toast({ 
         title: `Order Fetch Failed for ${partnerName}`,
@@ -170,19 +170,18 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
         variant: "destructive"
       });
     }
-  }, [toast]); // Added toast to dependency array
+  }, [toast]); 
 
   useEffect(() => {
     console.log("[PartnerTable] useEffect for partners changed. Processing partners:", partners.length);
     partners.forEach(partner => {
-      // Fetch if not present, or if previous fetch errored, or if data for this partner is simply missing
-      if (!partnerOrderData[partner.id] || partnerOrderData[partner.id]?.error) {
+      if (!partnerOrderData[partner.id] || partnerOrderData[partner.id]?.error || partnerOrderData[partner.id]?.isLoading === false) { // Fetch if not present, errored, or already loaded (to refresh)
         console.log(`[PartnerTable] useEffect: Triggering fetch for partner ${partner.id}`);
         fetchOrdersForPartner(partner.id, partner.name);
       }
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [partners, fetchOrdersForPartner]); // partnerOrderData removed from here to avoid loop if fetchOrdersForPartner itself updates it and is a dep
+  }, [partners, fetchOrdersForPartner]); // partnerOrderData removed 
 
   const filteredAndSortedPartners = useMemo(() => {
     let processedPartners = [...partners];
@@ -295,7 +294,6 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                 const isLoadingPartnerOrders = ordersInfo?.isLoading === true;
                 const partnerOrderError = ordersInfo?.error;
                 
-                // Derive counts from the live-fetched ordersInfo for direct cell display
                 const activeCount = ordersInfo?.active?.length || 0;
                 const deliveredCount = ordersInfo?.delivered?.length || 0;
                 const cancelledCount = ordersInfo?.cancelled?.length || 0;
@@ -322,12 +320,12 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                     </TableCell>
                     <TableCell className="text-center">{partner.currentLoad}</TableCell>
                     <TableCell className="text-xs align-top pt-3">
-                        {isLoadingPartnerOrders && !ordersInfo?.active && !ordersInfo?.delivered && !ordersInfo?.cancelled ? ( 
+                        {isLoadingPartnerOrders && !ordersInfo ? ( 
                              <div className="flex items-center justify-center">
                                 <Loader2 className="h-4 w-4 animate-spin" />
                                 <span className="ml-1">Loading orders...</span>
                              </div>
-                        ) : partnerOrderError && !ordersInfo?.active && !ordersInfo?.delivered && !ordersInfo?.cancelled ? (
+                        ) : partnerOrderError && !ordersInfo?.active ? ( // Check !ordersInfo.active to avoid showing error if there's old data
                             <div className="text-destructive text-center" title={partnerOrderError}>Error!</div>
                         ) : (
                             <div className="space-y-0.5 text-center">
@@ -397,4 +395,3 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
     </div>
   );
 }
-

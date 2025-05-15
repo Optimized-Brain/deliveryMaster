@@ -34,7 +34,7 @@ export async function GET(request: Request) {
       }
 
       const orderIds = assignmentsData.map(a => a.order_id);
-      console.log(`[API GET /api/orders] Found order IDs for partner ${assignedPartnerIdFilter}:`, orderIds);
+      console.log(`[API GET /api/orders] Found ${orderIds.length} order IDs for partner ${assignedPartnerIdFilter}:`, orderIds);
 
       // Step 2: Fetch orders matching these order_ids
       query = supabase
@@ -42,7 +42,7 @@ export async function GET(request: Request) {
         .select('id, customer_name, customer_phone, items, status, area, created_at, customer_address, assigned_to, total_amount')
         .in('id', orderIds);
       
-      // Apply status filter if also present
+      // Apply status filter if also present (though less common when fetching all for a partner)
       if (statusFilter) {
         console.log(`[API GET /api/orders] Applying status filter: ${statusFilter} to partner's orders`);
         query = query.eq('status', statusFilter);
@@ -68,6 +68,10 @@ export async function GET(request: Request) {
     }
 
     console.log(`[API GET /api/orders] Supabase query successful. Records fetched: ${supabaseData ? supabaseData.length : 'null'}`);
+    if (assignedPartnerIdFilter) {
+        console.log(`[API GET /api/orders] Returning ${supabaseData ? supabaseData.length : 0} orders for partner ${assignedPartnerIdFilter}.`);
+    }
+
 
     if (!supabaseData) {
       console.log('[API GET /api/orders] No data returned from Supabase. Returning empty array.');
@@ -84,7 +88,7 @@ export async function GET(request: Request) {
       creationDate: o.created_at,
       deliveryAddress: o.customer_address,
       assignedPartnerId: o.assigned_to,
-      orderValue: Number(o.total_amount) || 0, // Ensure orderValue is a number, default to 0
+      orderValue: Number(o.total_amount) || 0, 
     }));
 
     console.log(`[API GET /api/orders] Mapped ${orders.length} orders. Sending response.`);
@@ -164,7 +168,7 @@ export async function POST(request: Request) {
       creationDate: data.created_at,
       deliveryAddress: data.customer_address,
       assignedPartnerId: data.assigned_to,
-      orderValue: Number(data.total_amount) || 0, // Ensure orderValue is a number, default to 0
+      orderValue: Number(data.total_amount) || 0, 
     };
 
     return NextResponse.json({ message: 'Order created successfully', order: createdOrder }, { status: 201 });
@@ -185,4 +189,3 @@ export async function POST(request: Request) {
     }, { status: 500 });
   }
 }
-
