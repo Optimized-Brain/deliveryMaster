@@ -65,10 +65,10 @@ export async function PUT(request: Request, context: { params: Params }) {
         items: data.items || [],
         status: data.status as OrderStatus,
         area: data.area,
-        creationDate: data.created_at, // Mapped from created_at
-        deliveryAddress: data.customer_address, // Mapped from customer_address
+        creationDate: data.created_at,
+        deliveryAddress: data.customer_address,
         assignedPartnerId: data.assigned_to, 
-        orderValue: data.order_value,
+        orderValue: data.total_amount, // Mapped from total_amount
     };
 
     return NextResponse.json({ 

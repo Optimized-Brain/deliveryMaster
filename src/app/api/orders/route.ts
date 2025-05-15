@@ -48,9 +48,9 @@ export async function GET(request: Request) {
     status: o.status as OrderStatus,
     area: o.area,
     creationDate: o.created_at, 
-    deliveryAddress: o.customer_address, // Mapped from customer_address
+    deliveryAddress: o.customer_address,
     assignedPartnerId: o.assigned_to, 
-    orderValue: o.order_value,
+    orderValue: o.total_amount, // Mapped from total_amount
   }));
 
   return NextResponse.json(orders);
@@ -87,8 +87,8 @@ export async function POST(request: Request) {
       items: [{ name: validatedData.itemName, quantity: validatedData.itemQuantity }], // Simplified items structure
       status: 'pending' as OrderStatus, // Default status
       area: validatedData.area,
-      customer_address: validatedData.deliveryAddress, // Mapped to customer_address
-      order_value: validatedData.orderValue,
+      customer_address: validatedData.deliveryAddress,
+      total_amount: validatedData.orderValue, // Mapped to total_amount
       // Supabase will auto-generate 'id' (UUID) and 'created_at'
     };
 
@@ -122,9 +122,9 @@ export async function POST(request: Request) {
       status: data.status as OrderStatus,
       area: data.area,
       creationDate: data.created_at,
-      deliveryAddress: data.customer_address, // Mapped from customer_address
+      deliveryAddress: data.customer_address,
       assignedPartnerId: data.assigned_to,
-      orderValue: data.order_value,
+      orderValue: data.total_amount, // Mapped from total_amount
     };
 
     return NextResponse.json({ message: 'Order created successfully', order: createdOrder }, { status: 201 });
