@@ -35,7 +35,7 @@ export function SmartAssignmentForm() {
   const [isDataLoading, setIsDataLoading] = useState(true);
 
   const [aiSuggestion, setAiSuggestion] = useState<AssignOrderOutput | null>(null);
-  const [selectedPartnerForAssignment, setSelectedPartnerForAssignment] = useState<string>('');
+  const [selectedPartnerForAssignment, setSelectedPartnerForAssignment] = useState<string>(''); // Stores Partner ID
 
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
   const [availablePartners, setAvailablePartners] = useState<Partner[]>([]);
@@ -63,7 +63,7 @@ export function SmartAssignmentForm() {
         try {
           const errorText = await ordersResponse.text();
           console.error("Raw error response from /api/orders?status=pending:", errorText);
-          if (errorText.startsWith("<!DOCTYPE html>")) {
+          if (errorText.toLowerCase().includes("<!doctype html>")) {
             errorDetails = `Failed to fetch pending orders. Server returned an HTML error page (status: ${ordersResponse.status}). Check server logs.`;
           } else {
             const errorData = JSON.parse(errorText); 
@@ -83,7 +83,7 @@ export function SmartAssignmentForm() {
         try {
           const errorText = await partnersResponse.text();
           console.error("Raw error response from /api/partners?status=active:", errorText);
-           if (errorText.startsWith("<!DOCTYPE html>")) {
+           if (errorText.toLowerCase().includes("<!doctype html>")) {
             errorDetails = `Failed to fetch available partners. Server returned an HTML error page (status: ${partnersResponse.status}). Check server logs.`;
           } else {
             const errorData = JSON.parse(errorText); 
@@ -152,7 +152,6 @@ export function SmartAssignmentForm() {
     if (availablePartners.length === 0) {
         toast({ title: "No Partners", description: "No active partners available for AI suggestion.", variant: "default"});
         setIsFetchingSuggestion(false);
-        // Still allow manual assignment by showing the confirmation section
         setAiSuggestion({ suggestionMade: false }); 
         return;
     }
@@ -162,6 +161,7 @@ export function SmartAssignmentForm() {
       orderLocation: data.orderLocation || selectedOrder.area, 
       partnerList: availablePartners.map(p => ({
         partnerId: p.id,
+        partnerName: p.name, // Include partner name
         location: p.assignedAreas[0] || 'Unknown', 
         currentLoad: p.currentLoad,
         assignedAreas: p.assignedAreas,
@@ -172,12 +172,21 @@ export function SmartAssignmentForm() {
     try {
       const result = await assignOrder(input);
       setAiSuggestion(result);
-      if (result.suggestionMade && result.suggestedPartnerId) {
-        setSelectedPartnerForAssignment(result.suggestedPartnerId);
-        toast({
-          title: "AI Suggestion Ready",
-          description: `AI suggests partner ${result.suggestedPartnerId.substring(0,8)}... Review and confirm.`,
-        });
+      if (result.suggestionMade && result.suggestedPartnerName) {
+        const suggestedPartner = availablePartners.find(p => p.name === result.suggestedPartnerName);
+        if (suggestedPartner) {
+          setSelectedPartnerForAssignment(suggestedPartner.id);
+          toast({
+            title: "AI Suggestion Ready",
+            description: `AI suggests partner ${suggestedPartner.name}. Review and confirm.`,
+          });
+        } else {
+          toast({
+            title: "AI Suggestion Received",
+            description: `AI suggested partner "${result.suggestedPartnerName}", but this partner was not found in the available list. Please select manually.`,
+            variant: "default",
+          });
+        }
       } else {
          toast({
           title: "AI Analysis Complete",
@@ -192,7 +201,6 @@ export function SmartAssignmentForm() {
         description: (error as Error).message || "An unknown error occurred while getting AI suggestion.",
         variant: "destructive",
       });
-      // Allow manual assignment even if AI fails
       setAiSuggestion({ suggestionMade: false });
     } finally {
       setIsFetchingSuggestion(false);
@@ -224,13 +232,16 @@ export function SmartAssignmentForm() {
       if (!updateResponse.ok) {
         let errorDetails = `Failed to update order ${orderId.substring(0,8)}... status (API status: ${updateResponse.status}).`;
         try {
-            const errorData = await updateResponse.json();
-            // Prioritize the more specific 'error' field from API if available, then 'message'
-            errorDetails = errorData.error || errorData.message || `Failed to update order status. API responded with status ${updateResponse.status}.`;
+            const errorText = await updateResponse.text();
+            const errorData = JSON.parse(errorText);
+            errorDetails = errorData.message || errorData.error || `Failed to update order status. API responded with status ${updateResponse.status}.`;
+             if (errorText.toLowerCase().includes("<!doctype html>")) {
+                errorDetails = `Failed to update order status. Server returned an HTML error page (status: ${updateResponse.status}). Check server logs.`;
+             }
         } catch (e) {
              console.error(`Could not parse JSON response from PUT /api/orders/${orderId}/status:`, e);
              const errorText = await updateResponse.text().catch(() => "Could not retrieve error text.");
-             if (errorText.startsWith("<!DOCTYPE html>")) {
+             if (errorText.toLowerCase().includes("<!doctype html>")) {
                 errorDetails = `Failed to update order status. Server returned an HTML error page (status: ${updateResponse.status}). Check server logs.`;
              } else if ((e as Error).message.includes("JSON.parse")) {
                 errorDetails = `Failed to update order status. Server returned a non-JSON response (status: ${updateResponse.status}). Check server logs.`;
@@ -355,7 +366,7 @@ export function SmartAssignmentForm() {
               {pendingOrders.length === 0 && !isDataLoading && (
                  <p className="text-sm text-center text-muted-foreground">No pending orders available for assignment.</p>
               )}
-               {availablePartners.length === 0 && !isDataLoading && !isFetchingSuggestion && ( // Only show if not fetching partners
+               {availablePartners.length === 0 && !isDataLoading && !isFetchingSuggestion && (
                  <p className="text-sm text-center text-muted-foreground">No active partners available for assignment.</p>
               )}
             </form>
@@ -363,7 +374,7 @@ export function SmartAssignmentForm() {
         </CardContent>
       </Card>
 
-      {(aiSuggestion || (availablePartners.length > 0 && form.getValues('orderId'))) && ( // Show confirm section if AI suggestion OR if order selected & partners exist
+      {(aiSuggestion || (availablePartners.length > 0 && form.getValues('orderId'))) && ( 
         <div className="mt-8 space-y-6">
           {aiSuggestion && (
             <div className="flex justify-center">
@@ -375,7 +386,7 @@ export function SmartAssignmentForm() {
             <CardHeader>
               <CardTitle>Confirm Assignment</CardTitle>
               <CardDescription>
-                {aiSuggestion?.suggestionMade && aiSuggestion?.suggestedPartnerId 
+                {aiSuggestion?.suggestionMade && aiSuggestion?.suggestedPartnerName 
                   ? "Confirm the AI's suggestion or choose a different partner." 
                   : "Please select a partner to assign."}
               </CardDescription>
@@ -384,7 +395,7 @@ export function SmartAssignmentForm() {
               <FormItem> 
                 <Label htmlFor="partner-select">Assign to Partner</Label> 
                 <Select
-                  value={selectedPartnerForAssignment}
+                  value={selectedPartnerForAssignment} // This should be partner ID
                   onValueChange={setSelectedPartnerForAssignment}
                   disabled={isConfirmingAssignment || availablePartners.length === 0}
                 >
@@ -426,3 +437,5 @@ export function SmartAssignmentForm() {
     </div>
   );
 }
+
+    

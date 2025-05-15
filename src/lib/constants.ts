@@ -24,7 +24,7 @@ export const SAMPLE_ORDERS: Order[] = [
     customerPhone: '+91 98765 43210',
     items: [{ name: 'Paneer Tikka Masala', quantity: 1 }, { name: 'Lassi', quantity: 2 }],
     status: 'pending',
-    area: 'Koramangala',
+    area: 'Koramangala', // Bangalore
     creationDate: "2024-05-15T10:30:00.000Z",
     deliveryAddress: '123, 5th Cross, Koramangala, Bangalore, 560034',
     orderValue: 750.00,
@@ -36,7 +36,7 @@ export const SAMPLE_ORDERS: Order[] = [
     items: [{ name: 'Hyderabadi Biryani', quantity: 2 }],
     status: 'delivered',
     assignedPartnerId: DUMMY_PARTNER_UUID_1,
-    area: 'Bandra',
+    area: 'Bandra', // Mumbai
     creationDate: "2024-05-15T11:00:00.000Z",
     deliveryAddress: '456, Linking Road, Bandra West, Mumbai, 400050',
     orderValue: 900.00,
@@ -47,7 +47,7 @@ export const SAMPLE_ORDERS: Order[] = [
     customerPhone: '+91 91234 56789',
     items: [{ name: 'Chole Bhature', quantity: 1 }, { name: 'Masala Chai', quantity: 1 }],
     status: 'pending',
-    area: 'Connaught Place',
+    area: 'Connaught Place', // Delhi
     creationDate: "2024-05-14T14:15:00.000Z",
     deliveryAddress: 'Shop No. 7, Block A, Connaught Place, New Delhi, 110001',
     orderValue: 450.75,
@@ -59,43 +59,43 @@ export const SAMPLE_ORDERS: Order[] = [
     items: [{ name: 'Masala Dosa', quantity: 2 }, { name: 'Filter Coffee', quantity: 2 }],
     status: 'delivered',
     assignedPartnerId: DUMMY_PARTNER_UUID_2,
-    area: 'T. Nagar',
-    creationDate: "2023-04-14T16:45:00.000Z", // Older date for 30-day testing
+    area: 'T. Nagar', // Chennai
+    creationDate: "2024-05-14T16:45:00.000Z",
     deliveryAddress: '101, Usman Road, T. Nagar, Chennai, 600017',
     orderValue: 350.00,
   },
   {
-    id: 'cba09876-fedc-5432-1098-76543210fedc',
+    id: 'cb0adb79-e84f-4ce1-a6d3-1839759c0b22', // previously cba09876...
     customerName: 'Deepika Reddy',
     customerPhone: '+91 93456 78901',
     items: [{ name: 'Idli Sambar', quantity: 1 }],
     status: 'assigned',
     assignedPartnerId: DUMMY_PARTNER_UUID_1,
-    area: 'Jubilee Hills',
+    area: 'Jubilee Hills', // Hyderabad
     creationDate: "2024-05-13T09:20:00.000Z",
     deliveryAddress: 'Plot No. 202, Road No. 36, Jubilee Hills, Hyderabad, 500033',
     orderValue: 250.00,
   },
   {
-    id: '12345678-90ab-cdef-0123-456789abcdef',
+    id: '10acc407-d2f3-4f9f-8ed7-299c7749839e', // previously 12345678...
     customerName: 'Arjun Mehta',
     customerPhone: '+91 94567 89012',
     items: [{ name: 'Thali (Veg)', quantity: 1 }, { name: 'Gulab Jamun', quantity: 1 }],
     status: 'assigned',
     assignedPartnerId: DUMMY_PARTNER_UUID_2,
-    area: 'Salt Lake',
+    area: 'Salt Lake', // Kolkata
     creationDate: "2024-05-13T19:05:00.000Z",
     deliveryAddress: 'Sector V, Salt Lake City, Kolkata, 700091',
     orderValue: 600.50,
   },
   {
-    id: 'fedcba98-7654-3210-fedc-ba9876543210',
+    id: 'c56973f3-edf3-4f79-9725-4154b2b2989a', // previously fedcba98...
     customerName: 'Sneha Iyer',
     customerPhone: '+91 95678 90123',
     items: [{ name: 'Dal Makhani', quantity: 1 }, { name: 'Butter Naan', quantity: 2 }],
     status: 'picked',
     assignedPartnerId: DUMMY_PARTNER_UUID_1,
-    area: 'Indiranagar',
+    area: 'Indiranagar', // Bangalore
     creationDate: "2024-05-12T12:30:00.000Z",
     deliveryAddress: '100 Feet Road, Indiranagar, Bangalore, 560038',
     orderValue: 550.00,
@@ -107,7 +107,7 @@ export const SAMPLE_ORDERS: Order[] = [
     items: [{ name: 'Chicken Tikka', quantity: 1 }, { name: 'Roomali Roti', quantity: 3 }],
     status: 'picked',
     assignedPartnerId: DUMMY_PARTNER_UUID_3,
-    area: 'Powai',
+    area: 'Powai', // Mumbai
     creationDate: "2024-05-12T13:10:00.000Z",
     deliveryAddress: 'Near Powai Lake, Powai, Mumbai, 400076',
     orderValue: 800.00,
@@ -119,7 +119,7 @@ export const SAMPLE_ORDERS: Order[] = [
     items: [{ name: 'Pav Bhaji', quantity: 1 }],
     status: 'delivered',
     assignedPartnerId: DUMMY_PARTNER_UUID_2,
-    area: 'Karol Bagh',
+    area: 'Karol Bagh', // Delhi
     creationDate: "2024-05-11T18:50:00.000Z",
     deliveryAddress: 'Ajmal Khan Road, Karol Bagh, New Delhi, 110005',
     orderValue: 300.00,
@@ -130,7 +130,7 @@ export const SAMPLE_ORDERS: Order[] = [
     customerPhone: '+91 98901 23456',
     items: [{ name: 'Vegetable Korma', quantity: 1 }, { name: 'Jeera Rice', quantity: 1 }],
     status: 'pending',
-    area: 'Anna Nagar',
+    area: 'Anna Nagar', // Chennai
     creationDate: "2024-05-11T20:00:00.000Z",
     deliveryAddress: '3rd Avenue, Anna Nagar, Chennai, 600040',
     orderValue: 420.00,
@@ -142,7 +142,7 @@ export const SAMPLE_ORDERS: Order[] = [
     items: [{ name: 'Fish Curry', quantity: 1 }],
     status: 'cancelled',
     assignedPartnerId: DUMMY_PARTNER_UUID_3,
-    area: 'MG Road',
+    area: 'MG Road', // Bangalore
     creationDate: "2024-05-10T15:00:00.000Z",
     deliveryAddress: 'St. Marks Road, MG Road Area, Bangalore, 560001',
     orderValue: 650.00,
@@ -173,6 +173,16 @@ export const DASHBOARD_METRICS_CONFIG: Omit<Metric, 'value' | 'change' | 'change
   },
 ];
 
-export const AVAILABLE_AREAS: string[] = ['Koramangala', 'Bandra', 'Connaught Place', 'T. Nagar', 'Jubilee Hills', 'Salt Lake', 'Indiranagar', 'Powai', 'Karol Bagh', 'Anna Nagar', 'MG Road', 'Hauz Khas'];
+export const AVAILABLE_AREAS: string[] = [
+    'Koramangala', 'Indiranagar', 'Jayanagar', 'MG Road', 'Whitefield', // Bangalore
+    'Bandra', 'Andheri', 'Powai', 'Lower Parel', 'Malad', // Mumbai
+    'Connaught Place', 'Karol Bagh', 'Saket', 'Hauz Khas', 'Dwarka', // Delhi
+    'T. Nagar', 'Anna Nagar', 'Velachery', 'Mylapore', 'Adyar', // Chennai
+    'Jubilee Hills', 'Banjara Hills', 'Gachibowli', 'Hitech City', 'Secunderabad', // Hyderabad
+    'Salt Lake', 'Park Street', 'New Town', 'Howrah', 'Ballygunge' // Kolkata
+];
 export const PARTNER_STATUSES: PartnerStatus[] = ['active', 'inactive', 'on-break'];
 export const ORDER_STATUSES: OrderStatus[] = ['pending', 'assigned', 'picked', 'delivered', 'cancelled'];
+
+
+    
