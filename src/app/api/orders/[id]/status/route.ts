@@ -52,25 +52,25 @@ export async function PUT(request: Request, context: { params: Params }) {
     let partnerLoadUpdatedSuccessfully = true;
     let assignmentLoggedSuccessfully = true;
     let assignmentLogError = "";
+    let partnerLoadUpdateError = "";
 
     if (status === 'assigned' && assignedPartnerId) {
       // Attempt to log the assignment
       const assignmentLogData = {
         order_id: orderId,
         partner_id: assignedPartnerId,
-        status: 'assigned', // Set initial status for the assignment record
-        // 'reason' is left to DB default (NULL)
+        status: 'assigned', // Initial status for the assignment record
       };
       
       const { data: assignmentData, error: assignmentInsertError } = await supabase
         .from('assignments')
         .insert(assignmentLogData)
-        .select('id') // Select some field to confirm insert
+        .select('id') 
         .single(); 
 
       if (assignmentInsertError) {
         assignmentLoggedSuccessfully = false;
-        assignmentLogError = `Failed to create assignment record: ${assignmentInsertError.message}. This is a critical issue.`;
+        assignmentLogError = `Failed to create assignment record: ${assignmentInsertError.message}. This is a critical issue. Supabase Code: ${assignmentInsertError.code}`;
         // If logging the assignment is critical, return an error
         return NextResponse.json({ 
           message: `Order status updated to '${status}', but FAILED to log assignment record. Please check server logs for details. Supabase: ${assignmentLogError}`, 
@@ -78,7 +78,7 @@ export async function PUT(request: Request, context: { params: Params }) {
         }, { status: 500 });
       }
       
-      if (!assignmentData && assignmentLoggedSuccessfully) { // Should not happen if insert error is caught, but as a safeguard
+      if (!assignmentData && assignmentLoggedSuccessfully) { 
           assignmentLoggedSuccessfully = false; 
           assignmentLogError = 'Failed to confirm assignment record creation (no data returned after insert). This is a critical issue.';
           return NextResponse.json({
@@ -95,8 +95,12 @@ export async function PUT(request: Request, context: { params: Params }) {
           .eq('id', assignedPartnerId)
           .single();
 
-        if (partnerFetchError || !partnerData) {
+        if (partnerFetchError) {
           partnerLoadUpdatedSuccessfully = false;
+          partnerLoadUpdateError = `Failed to fetch partner ${assignedPartnerId} for load update: ${partnerFetchError.message}`;
+        } else if (!partnerData) {
+          partnerLoadUpdatedSuccessfully = false;
+          partnerLoadUpdateError = `Partner ${assignedPartnerId} not found for load update.`;
         } else {
           const newLoad = (partnerData.current_load || 0) + 1;
           const { error: partnerUpdateError } = await supabase
@@ -106,18 +110,19 @@ export async function PUT(request: Request, context: { params: Params }) {
 
           if (partnerUpdateError) {
             partnerLoadUpdatedSuccessfully = false;
+            partnerLoadUpdateError = `Failed to update partner ${assignedPartnerId} load: ${partnerUpdateError.message}`;
           }
         }
       } catch (e) {
-          // Catch any unexpected error during partner load update
           partnerLoadUpdatedSuccessfully = false;
+          partnerLoadUpdateError = `Unexpected error during partner load update: ${(e as Error).message}`;
       }
     }
 
     const finalUpdatedOrder: Order = {
       id: updatedOrderData.id,
       customerName: updatedOrderData.customer_name,
-      customerPhone: updatedOrderData.customer_phone,
+      customerPhone: updatedOrderData.customer_phone || undefined,
       items: updatedOrderData.items || [],
       status: updatedOrderData.status as OrderStatus,
       area: updatedOrderData.area,
@@ -132,9 +137,8 @@ export async function PUT(request: Request, context: { params: Params }) {
         if (assignmentLoggedSuccessfully) {
             successMessage += ` Assignment logged.`;
         }
-        // Warning for partner load update failure is kept separate, as assignment logging is more critical
         if (!partnerLoadUpdatedSuccessfully) {
-            successMessage += ` WARNING: Failed to update partner load. Please check server logs.`;
+            successMessage += ` WARNING: Partner load update failed: ${partnerLoadUpdateError}. Please check server logs.`;
         }
     }
 

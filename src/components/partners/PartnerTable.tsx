@@ -39,31 +39,44 @@ function AssignedOrdersPopoverContent({ partnerId, partnerName }: AssignedOrders
     try {
       const response = await fetch(`/api/orders?assignedPartnerId=${partnerId}`);
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: `Failed to fetch orders for partner ${partnerId}` }));
-        throw new Error(errorData.message);
+        const errorText = await response.text();
+        let message = `Failed to fetch orders for partner ${partnerName} (status: ${response.status})`;
+        try {
+            const errorData = JSON.parse(errorText);
+            message = errorData.message || errorData.error || message;
+        } catch (e) {
+            // If parsing fails, use the raw text or a generic message if text is HTML
+            if (errorText.toLowerCase().includes("<!doctype html>")) {
+                message = `Failed to fetch orders for ${partnerName}. Server returned an HTML error. Check server logs.`;
+            } else {
+                message = `Failed to fetch orders for ${partnerName}. Raw error: ${errorText.substring(0,100)}...`;
+            }
+        }
+        throw new Error(message);
       }
       const data: Order[] = await response.json();
       // Filter for active assignments ('assigned' or 'picked')
       const activeAssignments = data.filter(order => order.status === 'assigned' || order.status === 'picked');
       setOrders(activeAssignments);
     } catch (e) {
-      console.error(`Error fetching orders for partner ${partnerId}:`, e);
-      setError((e as Error).message);
+      console.error(`Error fetching orders for partner ${partnerName} (ID: ${partnerId}):`, e);
+      const errorMessage = (e as Error).message;
+      setError(errorMessage);
       toast({
         title: "Error Loading Assigned Orders",
-        description: (e as Error).message,
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
       setIsLoading(false);
     }
-  }, [partnerId, toast]);
+  }, [partnerId, partnerName, toast]);
 
   useEffect(() => {
-    if (partnerId) { // Only fetch if popover is opened (partnerId would be set)
-      fetchAssignedOrders();
-    }
-  }, [partnerId, fetchAssignedOrders]); // Rerun when partnerId changes (though popover typically re-mounts)
+    // This effect runs when the popover content is mounted / partnerId changes.
+    // Popover content is typically mounted when it's opened.
+    fetchAssignedOrders();
+  }, [fetchAssignedOrders]); // fetchAssignedOrders is memoized and changes if partnerId/Name changes
 
   if (isLoading) {
     return (
@@ -130,10 +143,14 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
         let valA = a[sortKey as keyof Partner];
         let valB = b[sortKey as keyof Partner];
         
-        if (typeof valA === 'string' && typeof valB === 'string') {
+        if (sortKey === 'currentLoad' || sortKey === 'rating') {
+            valA = Number(valA);
+            valB = Number(valB);
+        } else if (typeof valA === 'string' && typeof valB === 'string') {
           valA = valA.toLowerCase();
           valB = valB.toLowerCase();
         }
+
 
         if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
         if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
@@ -213,7 +230,7 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                 <TableHead onClick={() => handleSort('currentLoad')} className="cursor-pointer hover:bg-muted/50 text-center">
                   Load {renderSortIcon('currentLoad')}
                 </TableHead>
-                <TableHead>Assigned Orders</TableHead>
+                <TableHead className="text-center">Assigned Orders</TableHead>
                 <TableHead onClick={() => handleSort('rating')} className="cursor-pointer hover:bg-muted/50 text-center">
                   Rating {renderSortIcon('rating')}
                 </TableHead>
@@ -250,7 +267,7 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                       </PopoverTrigger>
                       <PopoverContent 
                         className="w-auto" 
-                        onOpenAutoFocus={(e) => e.preventDefault()} // Prevent focus stealing
+                        onOpenAutoFocus={(e) => e.preventDefault()} 
                       >
                         <AssignedOrdersPopoverContent partnerId={partner.id} partnerName={partner.name} />
                       </PopoverContent>
