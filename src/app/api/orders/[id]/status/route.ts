@@ -36,26 +36,27 @@ export async function PUT(request: Request, context: { params: Params }) {
       .single();
 
     if (error) {
-      console.error(`Error updating order ${id} status:`, error);
+      console.error(`Error updating order ${id} status in Supabase:`, error);
       if (error.code === 'PGRST116') { // Resource not found
-        return NextResponse.json({ message: `Order with ID ${id} not found` }, { status: 404 });
+        return NextResponse.json({ message: `Order with ID ${id} not found.` }, { status: 404 });
       }
-      return NextResponse.json({ message: `Error updating order status`, error: error.message }, { status: 500 });
+      // Make the primary message more specific
+      return NextResponse.json({ message: `Order update failed: ${error.message || 'Unknown Supabase error'}` }, { status: 500 });
     }
     
     if (!data) {
-        return NextResponse.json({ message: `Order with ID ${id} not found after update.` }, { status: 404 });
+        return NextResponse.json({ message: `Order with ID ${id} not found after update attempt.` }, { status: 404 });
     }
 
     return NextResponse.json({ 
-        message: `Status for order ${id} updated successfully`, 
+        message: `Status for order ${id} updated successfully to ${status}.`, 
         updatedOrder: {
             id: data.id,
             customerName: data.customer_name,
             items: data.items || [],
             status: data.status as OrderStatus,
             area: data.area,
-            creationDate: data.created_at, // Map created_at to creationDate
+            creationDate: data.created_at,
             deliveryAddress: data.delivery_address,
             assignedPartnerId: data.assigned_partner_id,
             orderValue: data.order_value,
@@ -64,7 +65,12 @@ export async function PUT(request: Request, context: { params: Params }) {
 
   } catch (e) {
     console.error('Error processing PUT /api/orders/[id]/status request:', e);
-    const errorMessage = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ message: 'Invalid request body or unexpected server error', error: errorMessage }, { status: 400 });
+    const errorInstance = e as Error;
+    // Distinguish client error (bad JSON) from other server errors
+    if (errorInstance instanceof SyntaxError && errorInstance.message.includes('JSON')) {
+        return NextResponse.json({ message: 'Invalid request body: Malformed JSON.', error: errorInstance.message }, { status: 400 });
+    }
+    return NextResponse.json({ message: 'Unexpected server error during order update.', error: errorInstance.message }, { status: 500 });
   }
 }
+

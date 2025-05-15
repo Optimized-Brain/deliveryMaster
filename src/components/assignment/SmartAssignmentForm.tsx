@@ -62,15 +62,11 @@ export function SmartAssignmentForm() {
             errorDetails = `Failed to fetch pending orders. Server returned an HTML error page (status: ${ordersResponse.status}). Check server logs.`;
           } else {
             const errorData = JSON.parse(errorText);
-            if (errorData.error) { 
-              errorDetails = `Failed to fetch pending orders: ${errorData.error}`;
-            } else if (errorData.message) {
-              errorDetails = errorData.message;
-            }
+            errorDetails = errorData.message || errorData.error || errorDetails;
           }
         } catch (parseError) {
           console.error("Failed to parse JSON error response from fetching orders. Server might have sent HTML.", parseError);
-          errorDetails = `Failed to fetch orders. Server returned a non-JSON response (status: ${ordersResponse.status}). Check server logs.`;
+          errorDetails = `Failed to fetch orders. Server returned a non-JSON response (status: ${ordersResponse.status}). Check server logs for the underlying error (e.g., environment variables).`;
         }
         throw new Error(errorDetails);
       }
@@ -83,18 +79,14 @@ export function SmartAssignmentForm() {
           const errorText = await partnersResponse.text();
           console.error("Raw error response from /api/partners?status=active:", errorText);
            if (errorText.startsWith("<!DOCTYPE html>")) {
-            errorDetails = `Failed to fetch available partners. Server returned an HTML error page (status: ${partnersResponse.status}). Check server logs.`;
+            errorDetails = `Failed to fetch available partners. Server returned an HTML error page (status: ${partnersResponse.status}). Check server logs for the underlying error (e.g., environment variables).`;
           } else {
             const errorData = JSON.parse(errorText);
-            if (errorData.error) { 
-              errorDetails = `Failed to fetch available partners: ${errorData.error}`;
-            } else if (errorData.message) {
-              errorDetails = errorData.message;
-            }
+            errorDetails = errorData.message || errorData.error || errorDetails;
           }
         } catch (parseError) {
           console.error("Failed to parse JSON error response from fetching partners. Server might have sent HTML.", parseError);
-          errorDetails = `Failed to fetch partners. Server returned a non-JSON response (status: ${partnersResponse.status}). Check server logs.`;
+          errorDetails = `Failed to fetch partners. Server returned a non-JSON response (status: ${partnersResponse.status}). Check server logs for the underlying error (e.g., environment variables).`;
         }
         throw new Error(errorDetails);
       }
@@ -170,12 +162,14 @@ export function SmartAssignmentForm() {
       });
 
       if (!updateResponse.ok) {
-        let errorDetails = `Failed to update order ${data.orderId} status (status: ${updateResponse.status})`;
+        let errorDetails = `Failed to update order ${data.orderId} status (API status: ${updateResponse.status}).`;
         try {
             const errorData = await updateResponse.json();
-            errorDetails = errorData.message || errorDetails;
+            if (errorData && errorData.message) { 
+                errorDetails = errorData.message;
+            }
         } catch (e) {
-            //  Failed to parse JSON, use the generic message
+             console.error(`Could not parse JSON response from PUT /api/orders/${data.orderId}/status:`, e);
         }
         throw new Error(errorDetails);
       }
@@ -185,7 +179,7 @@ export function SmartAssignmentForm() {
         description: `Order ${data.orderId} assigned to partner ${result.assignedPartnerId} and status updated.`,
       });
       
-      fetchData(); // Refetch data to update lists (e.g., pending orders)
+      fetchData(); 
 
     } catch (error) {
       console.error("Smart assignment or order update failed:", error);
