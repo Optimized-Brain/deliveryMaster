@@ -8,12 +8,17 @@ import { z } from 'zod';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const statusFilter = searchParams.get('status') as OrderStatus | null;
+  const assignedPartnerIdFilter = searchParams.get('assignedPartnerId');
 
   console.log("GET /api/orders - Using Supabase logic");
   let query = supabase.from('orders').select('id, customer_name, customer_phone, items, status, area, created_at, customer_address, assigned_to, total_amount');
 
   if (statusFilter) {
     query = query.eq('status', statusFilter);
+  }
+
+  if (assignedPartnerIdFilter) {
+    query = query.eq('assigned_to', assignedPartnerIdFilter);
   }
 
   query = query.order('created_at', { ascending: false });
@@ -30,7 +35,7 @@ export async function GET(request: Request) {
     customerName: o.customer_name,
     customerPhone: o.customer_phone,
     items: o.items || [],
-    status: o.status as OrderStatus, // Ensure status is lowercase
+    status: o.status.toLowerCase() as OrderStatus,
     area: o.area,
     creationDate: o.created_at,
     deliveryAddress: o.customer_address,
@@ -72,7 +77,7 @@ export async function POST(request: Request) {
       customer_name: validatedData.customerName,
       customer_phone: validatedData.customerPhone || null,
       items: [{ name: validatedData.itemName, quantity: validatedData.itemQuantity }],
-      status: 'pending' as OrderStatus, // Default status is lowercase
+      status: 'pending' as OrderStatus, 
       area: validatedData.area,
       customer_address: validatedData.deliveryAddress,
       total_amount: validatedData.orderValue,
@@ -106,7 +111,7 @@ export async function POST(request: Request) {
       customerName: data.customer_name,
       customerPhone: data.customer_phone,
       items: data.items || [],
-      status: data.status as OrderStatus,
+      status: data.status.toLowerCase() as OrderStatus,
       area: data.area,
       creationDate: data.created_at,
       deliveryAddress: data.customer_address,

@@ -1,24 +1,106 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
-import type { Partner, PartnerStatus } from "@/lib/types";
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import type { Partner, PartnerStatus, Order } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ArrowUpDown, MoreHorizontal, Edit2, Trash2, Phone, Mail, ListOrdered } from "lucide-react";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { ArrowUpDown, MoreHorizontal, Edit2, Trash2, Phone, Mail, ListOrdered, Loader2 } from "lucide-react";
 import { cn } from '@/lib/utils';
 import { PARTNER_STATUSES } from '@/lib/constants';
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
 
 interface PartnerTableProps {
   partners: Partner[];
   onEditPartner?: (partnerId: string) => void;
   onDeletePartner?: (partnerId: string) => void;
 }
+
+interface AssignedOrdersPopoverContentProps {
+  partnerId: string;
+  partnerName: string;
+}
+
+function AssignedOrdersPopoverContent({ partnerId, partnerName }: AssignedOrdersPopoverContentProps) {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const fetchAssignedOrders = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/orders?assignedPartnerId=${partnerId}`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: `Failed to fetch orders for partner ${partnerId}` }));
+        throw new Error(errorData.message);
+      }
+      const data: Order[] = await response.json();
+      // Filter for active assignments ('assigned' or 'picked')
+      const activeAssignments = data.filter(order => order.status === 'assigned' || order.status === 'picked');
+      setOrders(activeAssignments);
+    } catch (e) {
+      console.error(`Error fetching orders for partner ${partnerId}:`, e);
+      setError((e as Error).message);
+      toast({
+        title: "Error Loading Assigned Orders",
+        description: (e as Error).message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [partnerId, toast]);
+
+  useEffect(() => {
+    if (partnerId) { // Only fetch if popover is opened (partnerId would be set)
+      fetchAssignedOrders();
+    }
+  }, [partnerId, fetchAssignedOrders]); // Rerun when partnerId changes (though popover typically re-mounts)
+
+  if (isLoading) {
+    return (
+      <div className="p-4 flex items-center justify-center">
+        <Loader2 className="h-5 w-5 animate-spin mr-2" />
+        <span>Loading assigned orders...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="p-4 text-destructive">Error: {error}</div>;
+  }
+
+  if (orders.length === 0) {
+    return <div className="p-4 text-muted-foreground">No active orders assigned to {partnerName}.</div>;
+  }
+
+  return (
+    <div className="p-4 space-y-3 max-w-xs">
+      <h4 className="font-semibold text-sm">Active Assignments for {partnerName}:</h4>
+      <ul className="space-y-1 text-xs list-disc list-inside">
+        {orders.map(order => (
+          <li key={order.id}>
+            ID: {order.id.substring(0, 8)}... ({order.customerName}) - Status: {order.status}
+          </li>
+        ))}
+      </ul>
+      <Button variant="link" size="sm" asChild className="p-0 h-auto text-primary hover:underline mt-2">
+        <Link href={`/orders?assignedPartnerId=${partnerId}`}>
+          View All on Orders Page
+        </Link>
+      </Button>
+    </div>
+  );
+}
+
 
 type SortKey = keyof Partner | '';
 
@@ -31,7 +113,6 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
   const filteredAndSortedPartners = useMemo(() => {
     let processedPartners = [...partners];
 
-    // Filter by search term
     if (searchTerm) {
       processedPartners = processedPartners.filter(partner =>
         partner.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -40,12 +121,10 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
       );
     }
 
-    // Filter by status
     if (statusFilter !== 'all') {
       processedPartners = processedPartners.filter(partner => partner.status === statusFilter);
     }
 
-    // Sort
     if (sortKey) {
       processedPartners.sort((a, b) => {
         let valA = a[sortKey as keyof Partner];
@@ -163,11 +242,19 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                   </TableCell>
                   <TableCell className="text-center">{partner.currentLoad}</TableCell>
                   <TableCell className="text-center">
-                    <Button variant="link" size="sm" asChild className="p-0 h-auto">
-                      <Link href={`/orders?assignedPartnerId=${partner.id}`}>
-                        View ({partner.currentLoad}) <ListOrdered className="ml-1 h-3.5 w-3.5" />
-                      </Link>
-                    </Button>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="link" size="sm" className="p-0 h-auto">
+                          View ({partner.currentLoad}) <ListOrdered className="ml-1 h-3.5 w-3.5" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent 
+                        className="w-auto" 
+                        onOpenAutoFocus={(e) => e.preventDefault()} // Prevent focus stealing
+                      >
+                        <AssignedOrdersPopoverContent partnerId={partner.id} partnerName={partner.name} />
+                      </PopoverContent>
+                    </Popover>
                   </TableCell>
                   <TableCell className="text-center">{partner.rating.toFixed(1)}</TableCell>
                   <TableCell className="text-right">
