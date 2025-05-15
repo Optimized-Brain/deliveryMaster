@@ -22,8 +22,17 @@ export default function OrdersPage() {
     try {
       const response = await fetch('/api/orders');
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch orders');
+        let errorMessage = `Failed to fetch orders (status: ${response.status})`;
+        try {
+          const errorData = await response.json();
+          // Prioritize errorData.error (Supabase specific detail) then errorData.message (API level message)
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } catch (jsonParseError) {
+          // If parsing JSON fails, use the response status text or the default message
+          errorMessage = response.statusText || errorMessage;
+          console.error("Failed to parse error response from fetching orders:", jsonParseError);
+        }
+        throw new Error(errorMessage);
       }
       const data: Order[] = await response.json();
       setAllOrders(data);
