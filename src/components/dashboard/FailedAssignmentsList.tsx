@@ -24,7 +24,8 @@ export function FailedAssignmentsList() {
         let errorDetails = `Failed to fetch failed assignments (status: ${response.status})`;
         try {
             const errorData = await response.json();
-            errorDetails = errorData.message || errorData.error || errorDetails;
+            // Prioritize specific error details from the API response
+            errorDetails = String(errorData.error || (errorData.details ? JSON.stringify(errorData.details) : null) || errorData.message || errorDetails);
         } catch (e) {
             const errorText = await response.text().catch(() => "Could not retrieve error text.");
             if (errorText.toLowerCase().includes("<!doctype html>")) {
