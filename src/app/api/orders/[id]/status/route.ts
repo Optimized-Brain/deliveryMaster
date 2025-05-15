@@ -27,7 +27,7 @@ export async function PUT(request: Request, context: { params: Params }) {
     const orderUpdateData: { status: OrderStatus; assigned_to?: string | null } = { status: newOrderStatus as OrderStatus };
     if (assignedPartnerId && newOrderStatus === 'assigned') {
       orderUpdateData.assigned_to = assignedPartnerId;
-    } else if (newOrderStatus === 'pending') { // If reverting to pending, clear assigned_to
+    } else if (newOrderStatus === 'pending') {
       orderUpdateData.assigned_to = null;
     }
 
@@ -56,43 +56,36 @@ export async function PUT(request: Request, context: { params: Params }) {
 
 
     if (newOrderStatus === 'assigned' && assignedPartnerId) {
-      // Attempt to create base assignment record
-      // To satisfy NOT NULL and CHECK (status IN ('success', 'failed')) constraints,
-      // we set a default status of 'success'. This might be a placeholder
-      // depending on business logic and true initial state desired.
       const assignmentLogData = {
         order_id: orderId,
         partner_id: assignedPartnerId,
-        status: 'success', // Set initial status to 'success' to satisfy constraints
-        // reason will be NULL initially
+        status: 'success', // To satisfy NOT NULL and CHECK (status IN ('success', 'failed'))
       };
 
       const { data: assignmentData, error: assignmentInsertError } = await supabase
         .from('assignments')
         .insert(assignmentLogData)
-        .select('id')
+        .select('*') // Select all columns to be more robust with RLS
         .single();
 
       if (assignmentInsertError) {
         assignmentLoggedSuccessfully = false;
         assignmentLogError = `Failed to create assignment record: ${assignmentInsertError.message}. This is a critical issue. Supabase Code: ${assignmentInsertError.code}`;
-        // If assignment logging is critical and fails, return 500
         return NextResponse.json({
           message: `Order status updated to '${newOrderStatus}', but FAILED to log assignment record. Please check server logs for details. Supabase error: ${assignmentLogError}`,
           error: assignmentLogError
         }, { status: 500 });
       } else if (!assignmentData) {
           assignmentLoggedSuccessfully = false;
-          assignmentLogError = 'Failed to confirm assignment record creation (no data returned after insert despite no error). This is a critical issue.';
+          assignmentLogError = 'Failed to confirm assignment record creation (no data returned after insert despite no error). This could be an RLS issue. This is a critical issue.';
            return NextResponse.json({
-              message: `Order status updated to '${newOrderStatus}', but FAILED to confirm assignment record creation. Please check server logs.`,
+              message: `Order status updated to '${newOrderStatus}', but FAILED to confirm assignment record creation (no data returned). Please check server logs. Error: ${assignmentLogError}`,
               error: assignmentLogError
           }, { status: 500 });
       } else {
         assignmentLoggedSuccessfully = true;
       }
 
-      // Attempt to update partner load (auxiliary task)
       try {
         const { data: partnerData, error: partnerFetchError } = await supabase
           .from('delivery_partners')
@@ -140,12 +133,10 @@ export async function PUT(request: Request, context: { params: Params }) {
         if (assignmentLoggedSuccessfully) {
             successMessage += ` Assignment logged successfully.`;
         }
-        // If there was a partner load update message (even a warning), append it.
         if (partnerLoadUpdateMessage) {
             successMessage += ` ${partnerLoadUpdateMessage}`;
         }
     }
-
 
     return NextResponse.json({
       message: successMessage,
