@@ -33,10 +33,9 @@ export async function PUT(request: Request, context: { params: Params }) {
     if (assignedPartnerId && status === 'assigned') {
       orderUpdateData.assigned_to = assignedPartnerId;
     } else if (status === 'pending') { 
-      // If reverting to pending (e.g., due to an issue reported elsewhere, or direct call), clear assigned_to
       orderUpdateData.assigned_to = null;
     }
-    // For 'picked' or 'delivered', assigned_to is not changed by this basic status update, it's assumed to be already set.
+    
 
     console.log(`PUT /api/orders/${orderId}/status: Attempting to update order with data:`, orderUpdateData);
     const { data: updatedOrderData, error: orderUpdateError } = await supabase
@@ -51,6 +50,7 @@ export async function PUT(request: Request, context: { params: Params }) {
       if (orderUpdateError.code === 'PGRST116') { 
         return NextResponse.json({ message: `Order with ID ${orderId} not found.` }, { status: 404 });
       }
+      // Use the specific Supabase error message for other errors
       return NextResponse.json({ message: `Order update failed: ${orderUpdateError.message || 'Unknown Supabase error while updating order'}` }, { status: 500 });
     }
 
@@ -60,6 +60,9 @@ export async function PUT(request: Request, context: { params: Params }) {
     }
 
     console.log(`PUT /api/orders/${orderId}/status: Order ${orderId} updated successfully to status ${status}.`);
+
+    let assignmentLoggedSuccessfully = true;
+    let partnerLoadUpdatedSuccessfully = true;
 
     // If order is being assigned, update partner load and log to assignments table
     if (status === 'assigned' && assignedPartnerId) {
@@ -76,7 +79,7 @@ export async function PUT(request: Request, context: { params: Params }) {
         if (partnerFetchError || !partnerData) {
           const errorMsg = `Failed to fetch partner ${assignedPartnerId} for load update: ${partnerFetchError?.message || 'Partner not found.'}`;
           console.error(`PUT /api/orders/${orderId}/status: ${errorMsg}`);
-          // Note: We don't stop the main order assignment if this auxiliary task fails, but we log it.
+          partnerLoadUpdatedSuccessfully = false;
         } else {
           const newLoad = (partnerData.current_load || 0) + 1;
           const { error: partnerUpdateError } = await supabase
@@ -87,6 +90,7 @@ export async function PUT(request: Request, context: { params: Params }) {
           if (partnerUpdateError) {
             const errorMsg = `Error updating partner ${assignedPartnerId} load: ${partnerUpdateError.message}`;
             console.error(`PUT /api/orders/${orderId}/status: ${errorMsg}`);
+            partnerLoadUpdatedSuccessfully = false;
           } else {
             console.log(`PUT /api/orders/${orderId}/status: Partner ${assignedPartnerId} load updated to ${newLoad}.`);
           }
@@ -94,32 +98,32 @@ export async function PUT(request: Request, context: { params: Params }) {
       } catch (e) {
           const errorMsg = `Unexpected error during partner load update for partner ${assignedPartnerId}: ${(e as Error).message}`;
           console.error(`PUT /api/orders/${orderId}/status: ${errorMsg}`);
+          partnerLoadUpdatedSuccessfully = false;
       }
 
       // Attempt to create a base assignment record (auxiliary task)
-      // status and reason fields in 'assignments' table should be nullable and will be updated later if an issue occurs.
-      // 'created_at' (timestamp) should default to now() in the database.
       try {
         const assignmentLogData = {
           order_id: orderId,
           partner_id: assignedPartnerId,
           // status and reason are intentionally NOT set here. They are for delivery outcome.
+          // created_at should default to now() in the database.
         };
-        console.log(`PUT /api/orders/${orderId}/status: Attempting to create base assignment record:`, assignmentLogData);
+        console.log(`PUT /api/orders/${orderId}/status: Attempting to create base assignment record in 'assignments' table:`, assignmentLogData);
         const { error: assignmentInsertError } = await supabase
           .from('assignments')
           .insert(assignmentLogData)
-          .select(); // .select() can be useful for logging or if you need the created ID.
+          .select('id'); 
 
         if (assignmentInsertError) {
-          console.error(`PUT /api/orders/${orderId}/status: CRITICAL: Error creating base assignment record in 'assignments' table:`, assignmentInsertError);
-          // Consider if this failure should make the overall assignment fail or be just a warning.
-          // For now, it's logged, but the main order assignment still proceeds.
+          console.error(`PUT /api/orders/${orderId}/status: CRITICAL: Error creating base assignment record in 'assignments' table. Full error:`, JSON.stringify(assignmentInsertError, null, 2));
+          assignmentLoggedSuccessfully = false;
         } else {
           console.log(`PUT /api/orders/${orderId}/status: Base assignment record created for order ${orderId}, partner ${assignedPartnerId}.`);
         }
       } catch (e) {
         console.error(`PUT /api/orders/${orderId}/status: Unexpected error during base assignment record creation for order ${orderId}:`, e);
+        assignmentLoggedSuccessfully = false;
       }
     }
 
@@ -131,14 +135,27 @@ export async function PUT(request: Request, context: { params: Params }) {
       items: updatedOrderData.items || [],
       status: updatedOrderData.status as OrderStatus,
       area: updatedOrderData.area,
-      creationDate: updatedOrderData.created_at, // Ensure mapping from created_at
-      deliveryAddress: updatedOrderData.customer_address, // Ensure mapping from customer_address
-      assignedPartnerId: updatedOrderData.assigned_to, // Ensure mapping from assigned_to
-      orderValue: updatedOrderData.total_amount, // Ensure mapping from total_amount
+      creationDate: updatedOrderData.created_at, 
+      deliveryAddress: updatedOrderData.customer_address, 
+      assignedPartnerId: updatedOrderData.assigned_to, 
+      orderValue: updatedOrderData.total_amount, 
     };
+    
+    let successMessage = `Status for order ${orderId} updated successfully to ${status}.`;
+    if (status === 'assigned' && assignedPartnerId) {
+        if (partnerLoadUpdatedSuccessfully && assignmentLoggedSuccessfully) {
+            successMessage += ` Partner load updated and assignment logged.`;
+        } else {
+            let warnings = [];
+            if (!partnerLoadUpdatedSuccessfully) warnings.push("update partner load");
+            if (!assignmentLoggedSuccessfully) warnings.push("log assignment details");
+            successMessage += ` WARNING: Failed to ${warnings.join(' or ')}. Please check server logs.`;
+        }
+    }
+
 
     return NextResponse.json({
-      message: `Status for order ${orderId} updated successfully to ${status}. Associated tasks (partner load, assignment log) processed.`,
+      message: successMessage,
       updatedOrder: finalUpdatedOrder
     });
 
@@ -149,7 +166,6 @@ export async function PUT(request: Request, context: { params: Params }) {
      if (errorInstance instanceof SyntaxError && errorInstance.message.includes('JSON')) {
         return NextResponse.json({ message: 'Invalid request body: Malformed JSON.', error: errorInstance.message }, { status: 400 });
     }
-    // Ensure the error message in the response is a string
     const responseErrorMessage = errorInstance.message || String(e);
     return NextResponse.json({ message: errorMessage, error: responseErrorMessage }, { status: 500 });
   }

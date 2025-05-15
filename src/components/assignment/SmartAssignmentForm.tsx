@@ -64,14 +64,14 @@ export function SmartAssignmentForm() {
           const errorText = await ordersResponse.text();
           console.error("Raw error response from /api/orders?status=pending:", errorText);
           if (errorText.startsWith("<!DOCTYPE html>")) {
-            errorDetails = `Failed to fetch pending orders. Server returned an HTML error page (status: ${ordersResponse.status}). Check server logs for the underlying error (e.g., environment variables).`;
+            errorDetails = `Failed to fetch pending orders. Server returned an HTML error page (status: ${ordersResponse.status}). Check server logs.`;
           } else {
-            const errorData = JSON.parse(errorText); // Attempt to parse as JSON
-            errorDetails = errorData.error || errorData.message || errorDetails;
+            const errorData = JSON.parse(errorText); 
+            errorDetails = errorData.message || errorData.error || errorDetails;
           }
         } catch (parseError) {
           console.error("Failed to parse JSON error response from fetching orders. Server might have sent HTML.", parseError);
-          //  Keep the original errorDetails if parsing fails
+          errorDetails = `Failed to fetch pending orders (status: ${ordersResponse.status}). Server returned non-JSON response. Check server logs.`;
         }
         throw new Error(errorDetails);
       }
@@ -83,15 +83,15 @@ export function SmartAssignmentForm() {
         try {
           const errorText = await partnersResponse.text();
           console.error("Raw error response from /api/partners?status=active:", errorText);
-          if (errorText.startsWith("<!DOCTYPE html>")) {
-            errorDetails = `Failed to fetch available partners. Server returned an HTML error page (status: ${partnersResponse.status}). Check server logs for the underlying error (e.g., environment variables).`;
+           if (errorText.startsWith("<!DOCTYPE html>")) {
+            errorDetails = `Failed to fetch available partners. Server returned an HTML error page (status: ${partnersResponse.status}). Check server logs.`;
           } else {
-            const errorData = JSON.parse(errorText); // Attempt to parse as JSON
-            errorDetails = errorData.error || errorData.message || errorDetails;
+            const errorData = JSON.parse(errorText); 
+            errorDetails = errorData.message || errorData.error || errorDetails;
           }
         } catch (parseError) {
             console.error("Failed to parse JSON error response from fetching partners. Server might have sent HTML.", parseError);
-             // Keep the original errorDetails if parsing fails
+            errorDetails = `Failed to fetch available partners (status: ${partnersResponse.status}). Server returned non-JSON response. Check server logs.`;
         }
         throw new Error(errorDetails);
       }
@@ -107,11 +107,11 @@ export function SmartAssignmentForm() {
         } else {
             form.resetField('orderId');
             form.resetField('orderLocation');
-            if (queryOrderId) { // Only toast if a specific invalid orderId was in query
+            if (queryOrderId) { 
                 toast({
                     title: "Order Not Assignable",
-                    description: `Order ${queryOrderId} is not pending or not found. Please select another.`,
-                    variant: "default" // Changed from "warning" as it's not a standard variant
+                    description: `Order ${queryOrderId.substring(0,8)}... is not pending or not found. Please select another.`,
+                    variant: "default" 
                 });
             }
         }
@@ -136,7 +136,7 @@ export function SmartAssignmentForm() {
   const handleGetAISuggestion = async (data: AssignmentFormData) => {
     setIsFetchingSuggestion(true);
     setAiSuggestion(null);
-    setSelectedPartnerForAssignment(''); // Clear previous manual selection
+    setSelectedPartnerForAssignment(''); 
 
     const selectedOrder = pendingOrders.find(o => o.id === data.orderId);
     if (!selectedOrder) {
@@ -146,21 +146,22 @@ export function SmartAssignmentForm() {
     }
 
     if (availablePartners.length === 0) {
-        toast({ title: "Error", description: "No available partners to suggest from.", variant: "destructive"});
+        toast({ title: "No Partners", description: "No active partners available for AI suggestion.", variant: "default"});
         setIsFetchingSuggestion(false);
+        // Still allow manual assignment by showing the confirmation section
+        setAiSuggestion({ suggestionMade: false }); 
         return;
     }
 
     const input: AssignOrderInput = {
       orderId: data.orderId,
-      orderLocation: data.orderLocation || selectedOrder.area, // Ensure orderLocation is used
+      orderLocation: data.orderLocation || selectedOrder.area, 
       partnerList: availablePartners.map(p => ({
         partnerId: p.id,
-        // Use a sensible default if assignedAreas is empty, or ensure it always has at least one element
         location: p.assignedAreas[0] || 'Unknown', 
         currentLoad: p.currentLoad,
         assignedAreas: p.assignedAreas,
-        isAvailable: p.status === 'active', // Assuming 'active' means available
+        isAvailable: p.status === 'active', 
       })),
     };
 
@@ -171,12 +172,12 @@ export function SmartAssignmentForm() {
         setSelectedPartnerForAssignment(result.suggestedPartnerId);
         toast({
           title: "AI Suggestion Ready",
-          description: `AI suggests partner ${result.suggestedPartnerId}. Review and confirm.`,
+          description: `AI suggests partner ${result.suggestedPartnerId.substring(0,8)}... Review and confirm.`,
         });
       } else {
          toast({
           title: "AI Analysis Complete",
-          description: result.reason || "AI could not suggest a specific partner.",
+          description: "AI could not suggest a specific partner. Please select one manually.",
           variant: "default",
         });
       }
@@ -187,6 +188,8 @@ export function SmartAssignmentForm() {
         description: (error as Error).message || "An unknown error occurred while getting AI suggestion.",
         variant: "destructive",
       });
+      // Allow manual assignment even if AI fails
+      setAiSuggestion({ suggestionMade: false });
     } finally {
       setIsFetchingSuggestion(false);
     }
@@ -215,36 +218,34 @@ export function SmartAssignmentForm() {
       });
 
       if (!updateResponse.ok) {
-        let errorDetails = `Failed to update order ${orderId} status (API status: ${updateResponse.status}).`;
+        let errorDetails = `Failed to update order ${orderId.substring(0,8)}... status (API status: ${updateResponse.status}).`;
         try {
             const errorData = await updateResponse.json();
-            if (errorData && errorData.message) {
-                errorDetails = errorData.message; // Use the message from the API response
-            } else {
-                 // Attempt to get raw text if JSON parsing or message field fails
-                 const errorText = await updateResponse.text();
-                 console.error("Raw error text from PUT /api/orders/[id]/status:", errorText);
-                 errorDetails = `Failed to update order status (API status: ${updateResponse.status}). ${errorText.substring(0,100)}`;
-            }
+            errorDetails = errorData.message || `Failed to update order status. API responded with status ${updateResponse.status}.`;
         } catch (e) {
              console.error(`Could not parse JSON response from PUT /api/orders/${orderId}/status:`, e);
-             errorDetails = `Failed to update order status and parse error response (API status: ${updateResponse.status}). Check server logs.`;
+             const errorText = await updateResponse.text().catch(() => "Could not retrieve error text.");
+             if (errorText.startsWith("<!DOCTYPE html>")) {
+                errorDetails = `Failed to update order status. Server returned an HTML error page (status: ${updateResponse.status}). Check server logs.`;
+             } else {
+                errorDetails = `Failed to update order status and parse error response (API status: ${updateResponse.status}). Raw response: ${errorText.substring(0,100)}... Check server logs.`;
+             }
         }
         throw new Error(errorDetails);
       }
-
+      
+      const updateResult = await updateResponse.json();
       toast({
         title: "Order Assigned!",
-        description: `Order ${orderId} successfully assigned to partner ${selectedPartnerForAssignment}.`,
-        variant: "default" // Changed from success
+        description: updateResult.message || `Order ${orderId.substring(0,8)}... successfully assigned to partner ${selectedPartnerForAssignment.substring(0,8)}...`,
+        variant: "default" 
       });
 
-      // Reset form and state
-      form.reset({ orderId: "", orderLocation: "" }); // Reset react-hook-form fields
+      form.reset({ orderId: "", orderLocation: "" }); 
       setAiSuggestion(null);
       setSelectedPartnerForAssignment('');
-      fetchData(); // Refresh pending orders and available partners
-      // router.push('/orders'); // Optional: redirect after assignment
+      await fetchData(); 
+      // router.push('/orders'); 
 
     } catch (error) {
       console.error("Order assignment confirmation failed:", error);
@@ -290,10 +291,10 @@ export function SmartAssignmentForm() {
                         if (currentSelectedOrder) {
                           form.setValue("orderLocation", currentSelectedOrder.area);
                         } else {
-                           form.setValue("orderLocation", ""); // Clear if order not found (e.g. list changed)
+                           form.setValue("orderLocation", ""); 
                         }
-                        setAiSuggestion(null); // Clear previous AI suggestion
-                        setSelectedPartnerForAssignment(''); // Clear manual partner selection
+                        setAiSuggestion(null); 
+                        setSelectedPartnerForAssignment(''); 
                       }}
                       value={field.value}
                       disabled={isDataLoading || isFetchingSuggestion || isConfirmingAssignment}
@@ -335,7 +336,7 @@ export function SmartAssignmentForm() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={isFetchingSuggestion || isDataLoading || pendingOrders.length === 0 || availablePartners.length === 0 || isConfirmingAssignment || !form.getValues('orderId')}
+                disabled={isFetchingSuggestion || isDataLoading || pendingOrders.length === 0 || isConfirmingAssignment || !form.getValues('orderId')}
               >
                 {isFetchingSuggestion ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -347,7 +348,7 @@ export function SmartAssignmentForm() {
               {pendingOrders.length === 0 && !isDataLoading && (
                  <p className="text-sm text-center text-muted-foreground">No pending orders available for assignment.</p>
               )}
-               {availablePartners.length === 0 && !isDataLoading && (
+               {availablePartners.length === 0 && !isDataLoading && !isFetchingSuggestion && ( // Only show if not fetching partners
                  <p className="text-sm text-center text-muted-foreground">No active partners available for assignment.</p>
               )}
             </form>
@@ -355,46 +356,54 @@ export function SmartAssignmentForm() {
         </CardContent>
       </Card>
 
-      {aiSuggestion && (
+      {(aiSuggestion || (availablePartners.length > 0 && form.getValues('orderId'))) && ( // Show confirm section if AI suggestion OR if order selected & partners exist
         <div className="mt-8 space-y-6">
-          <div className="flex justify-center">
-           <AssignmentResultCard suggestion={aiSuggestion} />
-          </div>
+          {aiSuggestion && (
+            <div className="flex justify-center">
+              <AssignmentResultCard suggestion={aiSuggestion} />
+            </div>
+          )}
 
           <Card className="w-full max-w-xl mx-auto shadow-lg">
             <CardHeader>
               <CardTitle>Confirm Assignment</CardTitle>
               <CardDescription>
-                {aiSuggestion.suggestionMade && aiSuggestion.suggestedPartnerId 
+                {aiSuggestion?.suggestionMade && aiSuggestion?.suggestedPartnerId 
                   ? "Confirm the AI's suggestion or choose a different partner." 
-                  : "No AI suggestion provided. Please select a partner manually."}
+                  : "Please select a partner to assign."}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <FormItem> {/* Use FormItem for layout consistency, not for RHF context here */}
-                <Label htmlFor="partner-select">Assign to Partner</Label> {/* Standard Label */}
+              <FormItem> 
+                <Label htmlFor="partner-select">Assign to Partner</Label> 
                 <Select
                   value={selectedPartnerForAssignment}
                   onValueChange={setSelectedPartnerForAssignment}
                   disabled={isConfirmingAssignment || availablePartners.length === 0}
                 >
-                  {/* No FormControl needed here as this Select is not part of react-hook-form instance */}
                   <SelectTrigger id="partner-select">
                     <SelectValue placeholder="Select a partner" />
                   </SelectTrigger>
                   <SelectContent>
-                    {availablePartners.map(partner => (
-                      <SelectItem key={partner.id} value={partner.id}>
-                        {partner.name} (ID: {partner.id.substring(0,8)}...) - Load: {partner.currentLoad}
-                      </SelectItem>
-                    ))}
+                    {availablePartners.length > 0 ? (
+                        availablePartners.map(partner => (
+                        <SelectItem key={partner.id} value={partner.id}>
+                            {partner.name} (ID: {partner.id.substring(0,8)}...) - Load: {partner.currentLoad}
+                        </SelectItem>
+                        ))
+                    ) : (
+                         <SelectItem value="no-partners-selectable" disabled>No active partners available</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
+                 {availablePartners.length === 0 && (
+                    <p className="text-sm text-muted-foreground pt-1">No active partners available to select.</p>
+                )}
               </FormItem>
               <Button
                 onClick={handleConfirmAssignment}
                 className="w-full"
-                disabled={isConfirmingAssignment || !selectedPartnerForAssignment || availablePartners.length === 0}
+                disabled={isConfirmingAssignment || !selectedPartnerForAssignment || availablePartners.length === 0 || !form.getValues('orderId')}
               >
                 {isConfirmingAssignment ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -410,4 +419,3 @@ export function SmartAssignmentForm() {
     </div>
   );
 }
-
