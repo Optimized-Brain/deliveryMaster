@@ -1,3 +1,4 @@
+
 import type { LucideIcon } from 'lucide-react';
 
 export interface NavItem {
@@ -29,6 +30,7 @@ export type OrderStatus = 'pending' | 'assigned' | 'in-transit' | 'delivered' | 
 export interface Order {
   id: string;
   customerName: string;
+  customerPhone?: string; // Added customer phone
   items: { name: string; quantity: number }[];
   status: OrderStatus;
   area: string;

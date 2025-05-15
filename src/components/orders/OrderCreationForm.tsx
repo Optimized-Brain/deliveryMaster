@@ -14,8 +14,13 @@ import { useToast } from '@/hooks/use-toast';
 import { AVAILABLE_AREAS } from '@/lib/constants';
 import { Loader2 } from 'lucide-react';
 
+const phoneRegex = new RegExp(
+  /^([+]?[\s0-9]+)?(\d{3}|[(]?[0-9A-Z]{3}[)])?([-]?[\s]?[0-9A-Z]{3}[-]?[\s]?[0-9A-Z]{4,6})$/
+);
+
 const orderCreationSchema = z.object({
   customerName: z.string().min(2, "Customer name must be at least 2 characters"),
+  customerPhone: z.string().regex(phoneRegex, 'Invalid phone number').optional().or(z.literal('')),
   itemName: z.string().min(1, "Item name is required"),
   itemQuantity: z.coerce.number().int().min(1, "Quantity must be at least 1"),
   area: z.string().min(1, "Area is required"),
@@ -37,6 +42,7 @@ export function OrderCreationForm({ onOrderCreated }: OrderCreationFormProps) {
     resolver: zodResolver(orderCreationSchema),
     defaultValues: {
       customerName: "",
+      customerPhone: "",
       itemName: "",
       itemQuantity: 1,
       area: "",
@@ -92,6 +98,19 @@ export function OrderCreationForm({ onOrderCreated }: OrderCreationFormProps) {
               <FormLabel>Customer Name</FormLabel>
               <FormControl>
                 <Input placeholder="e.g., Jane Doe" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+         <FormField
+          control={form.control}
+          name="customerPhone"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Customer Phone (Optional)</FormLabel>
+              <FormControl>
+                <Input type="tel" placeholder="e.g., (555) 123-4567" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

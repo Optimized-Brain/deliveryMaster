@@ -41,7 +41,7 @@ export async function PUT(request: Request, context: { params: Params }) {
       .from('orders')
       .update(updateData)
       .eq('id', id)
-      .select()
+      .select('id, customer_name, customer_phone, items, status, area, created_at, customer_address, assigned_to, total_amount')
       .single();
 
     if (error) {
@@ -62,13 +62,14 @@ export async function PUT(request: Request, context: { params: Params }) {
     const updatedOrder: Order = {
         id: data.id,
         customerName: data.customer_name,
+        customerPhone: data.customer_phone,
         items: data.items || [],
         status: data.status as OrderStatus,
         area: data.area,
         creationDate: data.created_at,
         deliveryAddress: data.customer_address,
         assignedPartnerId: data.assigned_to, 
-        orderValue: data.total_amount, // Mapped from total_amount
+        orderValue: data.total_amount,
     };
 
     return NextResponse.json({ 

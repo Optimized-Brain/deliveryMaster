@@ -26,7 +26,7 @@ export async function GET(request: Request) {
   /*
   // --- Original Supabase logic (Uncomment to switch to live data) ---
   console.log("GET /api/orders - Using Supabase logic");
-  let query = supabase.from('orders').select('*');
+  let query = supabase.from('orders').select('id, customer_name, customer_phone, items, status, area, created_at, customer_address, assigned_to, total_amount');
 
   if (statusFilter) {
     query = query.eq('status', statusFilter);
@@ -44,13 +44,14 @@ export async function GET(request: Request) {
   const orders: Order[] = data.map((o: any) => ({
     id: o.id,
     customerName: o.customer_name,
+    customerPhone: o.customer_phone,
     items: o.items || [], 
     status: o.status as OrderStatus,
     area: o.area,
     creationDate: o.created_at, 
     deliveryAddress: o.customer_address,
     assignedPartnerId: o.assigned_to, 
-    orderValue: o.total_amount, // Mapped from total_amount
+    orderValue: o.total_amount,
   }));
 
   return NextResponse.json(orders);
@@ -58,9 +59,14 @@ export async function GET(request: Request) {
   */
 }
 
+const phoneRegex = new RegExp(
+  /^([+]?[\s0-9]+)?(\d{3}|[(]?[0-9A-Z]{3}[)])?([-]?[\s]?[0-9A-Z]{3}[-]?[\s]?[0-9A-Z]{4,6})$/
+);
+
 // Zod schema for validating new order data
 const createOrderSchema = z.object({
   customerName: z.string().min(2, "Customer name must be at least 2 characters"),
+  customerPhone: z.string().regex(phoneRegex, 'Invalid phone number').optional().or(z.literal('')),
   itemName: z.string().min(1, "Item name is required"),
   itemQuantity: z.number().int().min(1, "Quantity must be at least 1"),
   area: z.string().min(1, "Area is required"),
@@ -84,11 +90,12 @@ export async function POST(request: Request) {
 
     const newOrderSupabaseData = {
       customer_name: validatedData.customerName,
+      customer_phone: validatedData.customerPhone || null, // Save null if empty string
       items: [{ name: validatedData.itemName, quantity: validatedData.itemQuantity }], // Simplified items structure
       status: 'pending' as OrderStatus, // Default status
       area: validatedData.area,
       customer_address: validatedData.deliveryAddress,
-      total_amount: validatedData.orderValue, // Mapped to total_amount
+      total_amount: validatedData.orderValue,
       // Supabase will auto-generate 'id' (UUID) and 'created_at'
     };
 
@@ -97,7 +104,7 @@ export async function POST(request: Request) {
     const { data, error } = await supabase
       .from('orders')
       .insert(newOrderSupabaseData)
-      .select()
+      .select('id, customer_name, customer_phone, items, status, area, created_at, customer_address, assigned_to, total_amount')
       .single();
 
     if (error) {
@@ -118,13 +125,14 @@ export async function POST(request: Request) {
     const createdOrder: Order = {
       id: data.id,
       customerName: data.customer_name,
+      customerPhone: data.customer_phone,
       items: data.items || [],
       status: data.status as OrderStatus,
       area: data.area,
       creationDate: data.created_at,
       deliveryAddress: data.customer_address,
       assignedPartnerId: data.assigned_to,
-      orderValue: data.total_amount, // Mapped from total_amount
+      orderValue: data.total_amount,
     };
 
     return NextResponse.json({ message: 'Order created successfully', order: createdOrder }, { status: 201 });
