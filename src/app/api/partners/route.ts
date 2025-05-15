@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     email: p.email,
     phone: p.phone,
     status: p.status as PartnerStatus,
-    assignedAreas: p.assigned_areas || [],
+    assignedAreas: p.areas || [], // Changed from p.assigned_areas
     shiftSchedule: p.shift_schedule,
     currentLoad: p.current_load,
     rating: p.rating,
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       email: body.email,
       phone: body.phone,
       status: body.status || 'active',
-      assigned_areas: assignedAreasArray,
+      areas: assignedAreasArray, // Changed from assigned_areas
       shift_schedule: body.shiftSchedule,
       current_load: body.currentLoad || 0, // Default value
       rating: body.rating || 0, // Default value
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
       email: data.email,
       phone: data.phone,
       status: data.status as PartnerStatus,
-      assignedAreas: data.assigned_areas || [],
+      assignedAreas: data.areas || [], // Changed from data.assigned_areas
       shiftSchedule: data.shift_schedule,
       currentLoad: data.current_load,
       rating: data.rating,

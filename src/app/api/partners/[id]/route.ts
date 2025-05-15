@@ -22,7 +22,7 @@ export async function PUT(request: Request, context: { params: Params }) {
     if (body.email !== undefined) updateData.email = body.email;
     if (body.phone !== undefined) updateData.phone = body.phone;
     if (body.status !== undefined) updateData.status = body.status;
-    if (assignedAreasArray !== undefined) updateData.assigned_areas = assignedAreasArray;
+    if (assignedAreasArray !== undefined) updateData.areas = assignedAreasArray; // Changed from assigned_areas
     if (body.shiftSchedule !== undefined) updateData.shift_schedule = body.shiftSchedule;
     if (body.currentLoad !== undefined) updateData.current_load = body.currentLoad;
     if (body.rating !== undefined) updateData.rating = body.rating;
@@ -34,7 +34,7 @@ export async function PUT(request: Request, context: { params: Params }) {
     }
 
     const { data, error } = await supabase
-      .from('delivery_partners') // Changed from 'partners'
+      .from('delivery_partners')
       .update(updateData)
       .eq('id', id)
       .select()
@@ -58,7 +58,7 @@ export async function PUT(request: Request, context: { params: Params }) {
       email: data.email,
       phone: data.phone,
       status: data.status as PartnerStatus,
-      assignedAreas: data.assigned_areas || [],
+      assignedAreas: data.areas || [], // Changed from data.assigned_areas
       shiftSchedule: data.shift_schedule,
       currentLoad: data.current_load,
       rating: data.rating,
@@ -78,7 +78,7 @@ export async function DELETE(request: Request, context: { params: Params }) {
   const { id } = context.params;
 
   const { error } = await supabase
-    .from('delivery_partners') // Changed from 'partners'
+    .from('delivery_partners')
     .delete()
     .eq('id', id);
 
