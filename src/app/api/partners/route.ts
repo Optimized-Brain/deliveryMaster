@@ -6,7 +6,7 @@ import type { Partner, PartnerStatus } from '@/lib/types';
 // GET /api/partners
 export async function GET(request: Request) {
   const { data, error } = await supabase
-    .from('delivery_partners') // Changed from 'partners'
+    .from('delivery_partners')
     .select('*')
     .order('name', { ascending: true });
 
@@ -58,10 +58,10 @@ export async function POST(request: Request) {
     };
 
     const { data, error } = await supabase
-      .from('delivery_partners') // Changed from 'partners'
+      .from('delivery_partners')
       .insert(newPartnerData)
       .select()
-      .single(); // Use .single() if you expect one row back
+      .single(); 
 
     if (error) {
       console.error('Error creating partner:', error);
@@ -69,7 +69,8 @@ export async function POST(request: Request) {
     }
     
     if (!data) {
-      return NextResponse.json({ message: 'Failed to create partner, no data returned' }, { status: 500 });
+      console.error('Failed to create partner, no data returned after insert.');
+      return NextResponse.json({ message: 'Failed to create partner, no data returned after insert. This might indicate an RLS issue preventing read-back.' }, { status: 500 });
     }
 
     const createdPartner: Partner = {
@@ -88,7 +89,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ message: 'Partner created successfully', partner: createdPartner }, { status: 201 });
   } catch (e) {
-    console.error('Error processing request:', e);
-    return NextResponse.json({ message: 'Invalid request body' }, { status: 400 });
+    console.error('Error processing POST /api/partners request:', e);
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ message: 'Invalid request body or unexpected server error', error: errorMessage }, { status: 400 });
   }
 }

@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PARTNER_STATUSES } from '@/lib/constants'; // AVAILABLE_AREAS removed, assignedAreas is free text
+import { PARTNER_STATUSES } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
 import type { PartnerStatus } from '@/lib/types';
 
@@ -55,7 +55,8 @@ export function PartnerRegistrationForm({ onPartnerRegistered }: PartnerRegistra
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to register partner');
+        // Prioritize errorData.error (from Supabase) then errorData.message (API's own message)
+        throw new Error(errorData.error || errorData.message || 'Failed to register partner');
       }
 
       const result = await response.json();
