@@ -1,4 +1,5 @@
-"use client"; // Marking as client component because of useState and event handlers
+
+"use client"; 
 
 import React, { useState, useMemo } from 'react';
 import { OrderFilters } from "@/components/orders/OrderFilters";
@@ -9,17 +10,20 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function OrdersPage() {
   const { toast } = useToast();
-  const [allOrders] = useState<Order[]>(SAMPLE_ORDERS); // In real app, this would be fetched
+  const [allOrders] = useState<Order[]>(SAMPLE_ORDERS); 
   const [filteredOrders, setFilteredOrders] = useState<Order[]>(allOrders);
 
-  const handleFilterChange = (filters: { status?: OrderStatus; area?: string; date?: Date }) => {
+  const handleFilterChange = (filters: { status?: OrderStatus | "all"; area?: string | "all"; date?: Date }) => {
     let tempOrders = allOrders;
-    if (filters.status && filters.status !== "all" as any) { // 'all' is a custom value for UI
+    
+    if (filters.status && filters.status !== "all") {
       tempOrders = tempOrders.filter(order => order.status === filters.status);
     }
-    if (filters.area) {
+    
+    if (filters.area && filters.area !== "all") {
       tempOrders = tempOrders.filter(order => order.area.toLowerCase().includes(filters.area!.toLowerCase()));
     }
+    
     if (filters.date) {
       tempOrders = tempOrders.filter(order => 
         new Date(order.creationDate).toDateString() === filters.date!.toDateString()
@@ -30,6 +34,7 @@ export default function OrdersPage() {
 
   const handleClearFilters = () => {
     setFilteredOrders(allOrders);
+    // The OrderFilters component resets its own internal state
   }
 
   const handleViewOrder = (orderId: string) => {

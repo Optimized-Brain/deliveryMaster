@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -6,28 +7,34 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; // Ensure Card components are properly imported
+import { Label } from "@/components/ui/label"; // Ensure Label is properly imported
 import { CalendarIcon, FilterX } from "lucide-react";
 import { format } from "date-fns";
 import { AVAILABLE_AREAS, ORDER_STATUSES } from "@/lib/constants";
 import type { OrderStatus } from '@/lib/types';
 
 interface OrderFiltersProps {
-  onFilterChange: (filters: { status?: OrderStatus; area?: string; date?: Date }) => void;
+  onFilterChange: (filters: { status?: OrderStatus | "all"; area?: string | "all"; date?: Date }) => void;
   onClearFilters: () => void;
 }
 
 export function OrderFilters({ onFilterChange, onClearFilters }: OrderFiltersProps) {
-  const [status, setStatus] = useState<OrderStatus | undefined>(undefined);
-  const [area, setArea] = useState<string>("");
+  const [status, setStatus] = useState<OrderStatus | "all" | undefined>(undefined);
+  const [area, setArea] = useState<string>(""); // Empty string means placeholder is shown
   const [date, setDate] = useState<Date | undefined>(undefined);
 
   const handleApplyFilters = () => {
-    onFilterChange({ status, area: area || undefined, date });
+    onFilterChange({ 
+      status: status || undefined, // Pass undefined if status is empty or "all" if selected
+      area: area || undefined, // Pass undefined if area is empty string, or "all" if selected
+      date 
+    });
   };
 
   const handleClear = () => {
     setStatus(undefined);
-    setArea("");
+    setArea(""); // Set to empty string to show placeholder
     setDate(undefined);
     onClearFilters();
   };
@@ -41,7 +48,10 @@ export function OrderFilters({ onFilterChange, onClearFilters }: OrderFiltersPro
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
           <div>
             <Label htmlFor="statusFilter">Status</Label>
-            <Select value={status} onValueChange={(value) => setStatus(value as OrderStatus)}>
+            <Select 
+              value={status || ""} // Control select with empty string for placeholder
+              onValueChange={(value) => setStatus(value === "all" ? "all" : value as OrderStatus)}
+            >
               <SelectTrigger id="statusFilter">
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
@@ -56,12 +66,16 @@ export function OrderFilters({ onFilterChange, onClearFilters }: OrderFiltersPro
           
           <div>
             <Label htmlFor="areaFilter">Area</Label>
-             <Select value={area} onValueChange={setArea}>
+             <Select 
+                value={area} // Controlled by area state (empty string for placeholder)
+                onValueChange={(value) => setArea(value)} // value will be "all" or specific area
+             >
               <SelectTrigger id="areaFilter">
                 <SelectValue placeholder="All Areas" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Areas</SelectItem>
+                {/* Changed value from "" to "all" */}
+                <SelectItem value="all">All Areas</SelectItem> 
                 {AVAILABLE_AREAS.map(a => (
                   <SelectItem key={a} value={a}>{a}</SelectItem>
                 ))}
@@ -104,11 +118,3 @@ export function OrderFilters({ onFilterChange, onClearFilters }: OrderFiltersPro
     </Card>
   );
 }
-
-// Dummy Card components for compilation if not globally available in this context
-// In a real app, these would be imported from '@/components/ui/card'
-const Card = ({ className, children }: { className?: string, children: React.ReactNode }) => <div className={className}>{children}</div>;
-const CardHeader = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
-const CardTitle = ({className, children}: {className?: string, children: React.ReactNode}) => <h3 className={className}>{children}</h3>;
-const CardContent = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
-const Label = ({htmlFor, children}: {htmlFor: string, children: React.ReactNode}) => <label htmlFor={htmlFor} className="text-sm font-medium mb-1 block">{children}</label>;
