@@ -60,7 +60,7 @@ export default function PartnersPage() {
     const partnerToEdit = partners.find(p => p.id === partnerId);
     if (partnerToEdit) {
       setEditingPartner(partnerToEdit);
-      setActiveTab("register"); // Switch to the form tab, which will now be in edit mode
+      setActiveTab("register"); 
       toast({ title: "Editing Partner", description: `Editing details for ${partnerToEdit.name}` });
     } else {
       toast({ title: "Error", description: "Could not find partner to edit.", variant: "destructive" });
@@ -91,9 +91,9 @@ export default function PartnersPage() {
   };
 
   const handlePartnerRegistered = () => {
-    fetchPartners(); // Refetch partners list
-    setEditingPartner(null); // Ensure editing mode is off
-    setActiveTab("list"); // Switch to list view
+    fetchPartners(); 
+    setEditingPartner(null); 
+    setActiveTab("list"); 
   };
   
   const handlePartnerUpdated = () => {
@@ -105,13 +105,13 @@ export default function PartnersPage() {
 
   const handleTabChange = (newTab: string) => {
     if (newTab === "list") {
-      setEditingPartner(null); // Clear editing state when switching to list
+      setEditingPartner(null); 
     }
     setActiveTab(newTab);
   }
 
   const handleAddNewPartnerClick = () => {
-    setEditingPartner(null); // Ensure we are in "add" mode
+    setEditingPartner(null); 
     setActiveTab("register");
   }
   
@@ -152,7 +152,7 @@ export default function PartnersPage() {
             partnerToEdit={editingPartner}
             onPartnerRegistered={handlePartnerRegistered} 
             onPartnerUpdated={handlePartnerUpdated}
-            key={editingPartner ? editingPartner.id : 'register-new'} // Force re-render on edit mode change
+            key={editingPartner ? editingPartner.id : 'register-new'} 
           />
         </TabsContent>
       </Tabs>

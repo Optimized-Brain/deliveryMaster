@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -74,7 +75,7 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
   
   const getStatusBadgeVariant = (status: PartnerStatus) => {
     switch (status) {
-      case 'active': return 'default'; // Should be success: bright green
+      case 'active': return 'default'; 
       case 'inactive': return 'secondary';
       case 'on-break': return 'outline';
       default: return 'secondary';
@@ -90,7 +91,7 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
 
   const renderSortIcon = (key: SortKey) => {
     if (sortKey !== key) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />;
-    return sortOrder === 'asc' ? <ArrowUpDown className="ml-2 h-4 w-4" /> : <ArrowUpDown className="ml-2 h-4 w-4" />; // TODO: use specific up/down icons
+    return sortOrder === 'asc' ? <ArrowUpDown className="ml-2 h-4 w-4" /> : <ArrowUpDown className="ml-2 h-4 w-4" />; 
   };
 
   return (

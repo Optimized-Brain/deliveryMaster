@@ -22,9 +22,9 @@ export async function PUT(request: Request, context: { params: Params }) {
     if (body.email !== undefined) updateData.email = body.email;
     if (body.phone !== undefined) updateData.phone = body.phone;
     if (body.status !== undefined) updateData.status = body.status;
-    if (assignedAreasArray !== undefined) updateData.areas = assignedAreasArray; // maps to 'areas'
-    if (body.shiftStart !== undefined) updateData.shift_start = body.shiftStart; // maps to 'shift_start'
-    if (body.shiftEnd !== undefined) updateData.shift_end = body.shiftEnd;       // maps to 'shift_end'
+    if (assignedAreasArray !== undefined) updateData.areas = assignedAreasArray; 
+    if (body.shiftStart !== undefined) updateData.shift_start = body.shiftStart; 
+    if (body.shiftEnd !== undefined) updateData.shift_end = body.shiftEnd;       
     if (body.currentLoad !== undefined) updateData.current_load = body.currentLoad;
     if (body.rating !== undefined) updateData.rating = body.rating;
     if (body.avatarUrl !== undefined) updateData.avatar_url = body.avatarUrl;
@@ -72,7 +72,8 @@ export async function PUT(request: Request, context: { params: Params }) {
     return NextResponse.json({ message: `Partner ${id} updated successfully`, partner: updatedPartner });
   } catch (e) {
     console.error('Error processing request:', e);
-    return NextResponse.json({ message: 'Invalid request body' }, { status: 400 });
+    const errorMessage = e instanceof Error ? e.message : 'Invalid request body or unexpected server error';
+    return NextResponse.json({ message: errorMessage, error: e instanceof Error ? e.message : String(e) }, { status: 400 });
   }
 }
 
