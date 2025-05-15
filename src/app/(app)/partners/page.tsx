@@ -73,14 +73,15 @@ export default function PartnersPage() {
   };
 
   const handleDeletePartner = async (partnerId: string) => {
-    console.log(`[PartnersPage] handleDeletePartner called for ID: ${partnerId}`);
+    console.log(`[PartnersPage] handleDeletePartner ENTERED for ID: ${partnerId}`);
     const partnerToDelete = partners.find(p => p.id === partnerId);
     if (!partnerToDelete) {
-      toast({ title: "Error", description: "Partner not found for deletion.", variant: "destructive" });
+      toast({ title: "Error", description: "Partner not found for deletion in local list.", variant: "destructive" });
       console.error(`[PartnersPage] Partner with ID ${partnerId} not found in local state for deletion.`);
       return;
     }
 
+    console.log(`[PartnersPage] About to confirm deletion for partner: "${partnerToDelete.name}"`);
     if (window.confirm(`Are you sure you want to delete partner "${partnerToDelete.name}"? This action cannot be undone.`)) {
       console.log(`[PartnersPage] User confirmed deletion for partner: ${partnerToDelete.name}`);
       try {
@@ -95,27 +96,34 @@ export default function PartnersPage() {
             errorDetails = errorData.message || errorData.error || errorDetails;
           } catch (e) {
             const errorText = await response.text().catch(() => "Could not retrieve error text");
-            console.error(`[PartnersPage] Could not parse JSON error response from delete API for ${partnerId}. Raw text: ${errorText.substring(0,500)}`);
+            console.error(`[PartnersPage] Could not parse JSON error response from delete API for ${partnerId}. Status: ${response.status}. Raw text: ${errorText.substring(0,500)}`);
             if (errorText.toLowerCase().includes("<!doctype html>")) {
-                errorDetails = `Failed to delete partner. Server returned an HTML error (status: ${response.status}).`;
+                errorDetails = `Failed to delete partner. Server returned an HTML error (status: ${response.status}). Check server logs.`;
+            } else if (response.statusText) {
+                 errorDetails = `Failed to delete partner. Server responded with: ${response.status} ${response.statusText}.`;
             } else {
                 errorDetails = `Failed to delete partner (status: ${response.status}). Server returned non-JSON response.`;
             }
           }
-          console.error(`[PartnersPage] Delete failed: ${errorDetails}`);
+          console.error(`[PartnersPage] Delete operation failed: ${errorDetails}`);
           throw new Error(errorDetails);
         }
         
-        // If deletion is successful (response.ok is true)
-        console.log(`[PartnersPage] Successfully deleted partner ${partnerId} via API.`);
+        const result = await response.json(); 
+        console.log(`[PartnersPage] Successfully deleted partner ${partnerId} via API. API Message: ${result.message}`);
         setPartners(prevPartners => prevPartners.filter(p => p.id !== partnerId));
-        toast({ title: "Partner Deleted", description: `Partner ${partnerToDelete.name} has been successfully deleted.`, variant: "default" });
+        toast({ title: "Partner Deleted", description: result.message || `Partner ${partnerToDelete.name} has been successfully deleted.`, variant: "default" });
       } catch (error) {
         console.error(`[PartnersPage] Error during handleDeletePartner for ${partnerId}:`, error);
-        toast({ title: "Deletion Failed", description: (error as Error).message, variant: "destructive" });
+        toast({ 
+          title: "Deletion Operation Failed", 
+          description: (error as Error).message || "An unexpected error occurred during deletion.", 
+          variant: "destructive" 
+        });
       }
     } else {
       console.log(`[PartnersPage] User cancelled deletion for partner: ${partnerToDelete.name}`);
+      toast({ title: "Deletion Cancelled", description: `Deletion of partner ${partnerToDelete.name} was cancelled.`, variant: "default" });
     }
   };
 
@@ -192,4 +200,6 @@ export default function PartnersPage() {
     </div>
   );
 }
+    
+
     

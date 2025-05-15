@@ -284,7 +284,17 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                           </DropdownMenuItem>
                         )}
                         {onDeletePartner && (
-                          <DropdownMenuItem onClick={() => onDeletePartner(partner.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                          <DropdownMenuItem 
+                            onClick={() => {
+                              console.log('[PartnerTable] Delete DropdownMenuItem clicked for partner ID:', partner.id);
+                              if (onDeletePartner) {
+                                onDeletePartner(partner.id);
+                              } else {
+                                console.error("[PartnerTable] onDeletePartner prop is undefined.");
+                              }
+                            }} 
+                            className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                          >
                             <Trash2 className="mr-2 h-4 w-4" /> Delete
                           </DropdownMenuItem>
                         )}
@@ -300,4 +310,6 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
     </div>
   );
 }
+    
+
     
