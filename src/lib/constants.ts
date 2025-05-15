@@ -1,6 +1,6 @@
 
 import type { NavItem, Partner, Order, Metric, PartnerStatus, OrderStatus } from '@/lib/types';
-import { LayoutDashboard, ListOrdered, Users, Shuffle, Package, BarChart3, Star, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { LayoutDashboard, ListOrdered, Users, Shuffle, Package, BarChart3, Star, TrendingUp, TrendingDown, DollarSign, CheckCircle, AlertOctagon, Percent } from 'lucide-react';
 
 export const APP_NAME = "SwiftRoute";
 
@@ -65,7 +65,7 @@ export const SAMPLE_ORDERS: Order[] = [
     orderValue: 350.00,
   },
   {
-    id: 'cb0adb79-e84f-4ce1-a6d3-1839759c0b22', // previously cba09876...
+    id: 'cb0adb79-e84f-4ce1-a6d3-1839759c0b22', 
     customerName: 'Deepika Reddy',
     customerPhone: '+91 93456 78901',
     items: [{ name: 'Idli Sambar', quantity: 1 }],
@@ -77,7 +77,7 @@ export const SAMPLE_ORDERS: Order[] = [
     orderValue: 250.00,
   },
   {
-    id: '10acc407-d2f3-4f9f-8ed7-299c7749839e', // previously 12345678...
+    id: '10acc407-d2f3-4f9f-8ed7-299c7749839e', 
     customerName: 'Arjun Mehta',
     customerPhone: '+91 94567 89012',
     items: [{ name: 'Thali (Veg)', quantity: 1 }, { name: 'Gulab Jamun', quantity: 1 }],
@@ -89,7 +89,7 @@ export const SAMPLE_ORDERS: Order[] = [
     orderValue: 600.50,
   },
   {
-    id: 'c56973f3-edf3-4f79-9725-4154b2b2989a', // previously fedcba98...
+    id: 'c56973f3-edf3-4f79-9725-4154b2b2989a', 
     customerName: 'Sneha Iyer',
     customerPhone: '+91 95678 90123',
     items: [{ name: 'Dal Makhani', quantity: 1 }, { name: 'Butter Naan', quantity: 2 }],
@@ -149,7 +149,7 @@ export const SAMPLE_ORDERS: Order[] = [
   },
 ];
 
-// Initial structure for dashboard metrics. Values will be updated dynamically in DashboardPage.tsx
+// Structure for dashboard metrics. Values will be updated dynamically.
 export const DASHBOARD_METRICS_CONFIG: Omit<Metric, 'value' | 'change' | 'changeType'>[] = [
   {
     id: 'metric-total-orders',
@@ -164,12 +164,22 @@ export const DASHBOARD_METRICS_CONFIG: Omit<Metric, 'value' | 'change' | 'change
   {
     id: 'metric-delivered-orders',
     title: 'Total Delivered Orders',
-    icon: BarChart3,
+    icon: CheckCircle, 
   },
   {
     id: 'metric-avg-order-value',
     title: 'Avg. Order Value (₹)',
     icon: DollarSign,
+  },
+  {
+    id: 'metric-total-assignments',
+    title: 'Total Assignments',
+    icon: Users, // Using Users icon as a placeholder for assignments
+  },
+  {
+    id: 'metric-assignment-success-rate',
+    title: 'Assignment Success Rate',
+    icon: Percent,
   },
 ];
 

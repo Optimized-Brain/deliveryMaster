@@ -41,13 +41,13 @@ export interface Order {
   orderValue: number; // maps to orders.total_amount
 }
 
-// This type describes the state of an assignment
+// This type describes the state of an assignment log
 export type Assignment = {
   id: string; // assignment id
   order_id: string;
   partner_id: string;
   timestamp: string; // Supabase created_at for the assignment record
-  status: 'success' | 'failed' | 'active'; // 'active' could be initial, or 'assigned'
+  status: 'success' | 'failed' | 'active' | 'assigned'; // 'active'/'assigned' for initial, 'success'/'failed' for outcome
   reason?: string; // Reason for failure, if status is 'failed'
 };
 
@@ -61,9 +61,9 @@ export interface FailedAssignmentInfo {
 }
 
 export type AssignmentMetrics = {
-  totalAssigned: number;
-  successRate: number;
-  averageTime: number; // Consider if this should be a string or a number (e.g., in minutes)
+  totalAssignments: number;
+  successfulAssignments: number;
+  successRate: number; // Percentage, e.g., 95.5
   failureReasons: {
     reason: string;
     count: number;
@@ -84,3 +84,4 @@ export interface DailyOrdersChartData {
   date: string; // Format: "MMM d"
   orders: number;
 }
+

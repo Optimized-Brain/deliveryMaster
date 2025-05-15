@@ -6,23 +6,28 @@ import { MetricsGrid } from "@/components/dashboard/MetricsGrid";
 import { RecentActivityChart } from "@/components/dashboard/RecentActivityChart";
 import { FailedAssignmentsList } from "@/components/dashboard/FailedAssignmentsList";
 import { DASHBOARD_METRICS_CONFIG } from "@/lib/constants";
-import type { Metric, Order } from "@/lib/types";
+import type { Metric, Order, AssignmentMetrics } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle, ListChecks } from "lucide-react";
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function DashboardPage() {
   const { toast } = useToast();
   const [metrics, setMetrics] = useState<Metric[]>(DASHBOARD_METRICS_CONFIG.map(m => ({ ...m, value: "...", change: "", changeType: "neutral" })));
   const [allOrders, setAllOrders] = useState<Order[]>([]);
+  const [assignmentMetrics, setAssignmentMetrics] = useState<AssignmentMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAssignmentMetricsLoading, setIsAssignmentMetricsLoading] = useState(true);
 
   const fetchDashboardData = useCallback(async () => {
     setIsLoading(true);
+    setIsAssignmentMetricsLoading(true);
     try {
-      const [ordersResponse, pendingOrdersResponse] = await Promise.all([
+      const [ordersResponse, pendingOrdersResponse, assignmentMetricsResponse] = await Promise.all([
         fetch('/api/orders'), 
-        fetch('/api/orders?status=pending') 
+        fetch('/api/orders?status=pending'),
+        fetch('/api/assignments/metrics')
       ]);
 
       if (!ordersResponse.ok) {
@@ -37,6 +42,15 @@ export default function DashboardPage() {
         throw new Error(errorData.message || `Failed to fetch pending orders`);
       }
       const fetchedPendingOrders: Order[] = await pendingOrdersResponse.json();
+
+      if (!assignmentMetricsResponse.ok) {
+        const errorData = await assignmentMetricsResponse.json().catch(() => ({ message: `Failed to fetch assignment metrics (status: ${assignmentMetricsResponse.status})` }));
+        throw new Error(errorData.message || `Failed to fetch assignment metrics`);
+      }
+      const fetchedAssignmentMetrics: AssignmentMetrics = await assignmentMetricsResponse.json();
+      setAssignmentMetrics(fetchedAssignmentMetrics);
+      setIsAssignmentMetricsLoading(false);
+
 
       const totalOrders = fetchedOrders.length;
       const pendingOrdersCount = fetchedPendingOrders.length;
@@ -53,6 +67,8 @@ export default function DashboardPage() {
         if (metric.id === 'metric-pending-orders') return { ...metric, value: pendingOrdersCount };
         if (metric.id === 'metric-delivered-orders') return { ...metric, title: "Total Delivered Orders", value: totalDeliveredOrders }; 
         if (metric.id === 'metric-avg-order-value') return { ...metric, value: `₹${avgOrderValue.toFixed(2)}` };
+        if (metric.id === 'metric-total-assignments' && fetchedAssignmentMetrics) return { ...metric, value: fetchedAssignmentMetrics.totalAssignments };
+        if (metric.id === 'metric-assignment-success-rate' && fetchedAssignmentMetrics) return { ...metric, value: `${fetchedAssignmentMetrics.successRate.toFixed(1)}%` };
         return { ...metric, value: "N/A" }; 
       }));
 
@@ -64,6 +80,7 @@ export default function DashboardPage() {
         variant: "destructive",
       });
        setMetrics(DASHBOARD_METRICS_CONFIG.map(m => ({ ...m, value: "Error", change: "", changeType: "negative" })));
+       setAssignmentMetrics(null); // Clear assignment metrics on error
     } finally {
       setIsLoading(false);
     }
@@ -97,8 +114,8 @@ export default function DashboardPage() {
         <MetricsGrid metrics={metrics} />
       )}
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7"> {/* Adjusted grid columns for 3 cards */}
+        <Card className="lg:col-span-3"> {/* Chart takes 3/7ths */}
           <CardHeader>
             <CardTitle>Recent Order Activity (Last 7 Days)</CardTitle>
             <CardDescription>Number of orders created per day.</CardDescription>
@@ -118,11 +135,52 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-        {/* The FailedAssignmentsList component is now placed here, replacing the old System Status card */}
-        <FailedAssignmentsList />
+        
+        <FailedAssignmentsList className="lg:col-span-2" /> {/* Reported issues take 2/7ths */}
+
+        <Card className="lg:col-span-2 shadow-lg"> {/* Assignment Failure Reasons takes 2/7ths */}
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-6 w-6 text-amber-500" />
+              <CardTitle>Top Assignment Failure Reasons</CardTitle>
+            </div>
+            <CardDescription>Common reasons for reported assignment issues.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isAssignmentMetricsLoading ? (
+              <div className="flex items-center justify-center h-40">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="ml-2 text-muted-foreground">Loading failure reasons...</p>
+              </div>
+            ) : assignmentMetrics && assignmentMetrics.failureReasons.length > 0 ? (
+              <ScrollArea className="h-[300px] pr-3"> {/* Adjusted height */}
+                <ul className="space-y-2">
+                  {assignmentMetrics.failureReasons.map((item, index) => (
+                    <li key={index} className="p-2.5 border rounded-md shadow-sm bg-card hover:bg-muted/50 transition-colors">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm truncate" title={item.reason}>{item.reason || "N/A"}</span>
+                        <span className="text-sm font-semibold text-primary">{item.count}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </ScrollArea>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-40 text-center">
+                 <ListChecks className="h-12 w-12 text-emerald-500 mb-3" />
+                <p className="text-muted-foreground">No specific failure reasons reported or tracked.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
-      
-      {/* The separate row for FailedAssignmentsList has been removed */}
     </div>
   );
+}
+
+declare module '@/components/dashboard/FailedAssignmentsList' {
+  interface FailedAssignmentsListProps {
+    className?: string;
+  }
+  export function FailedAssignmentsList(props: FailedAssignmentsListProps): JSX.Element;
 }

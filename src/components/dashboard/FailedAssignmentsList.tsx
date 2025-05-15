@@ -10,8 +10,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
 import { Button } from '../ui/button';
+import { cn } from '@/lib/utils';
 
-export function FailedAssignmentsList() {
+export interface FailedAssignmentsListProps {
+  className?: string;
+}
+
+export function FailedAssignmentsList({ className }: FailedAssignmentsListProps) {
   const { toast } = useToast();
   const [failedAssignments, setFailedAssignments] = useState<FailedAssignmentInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -24,8 +29,8 @@ export function FailedAssignmentsList() {
         let errorDetails = `Failed to fetch failed assignments (status: ${response.status})`;
         try {
             const errorData = await response.json();
-            // Prioritize specific error details from the API response
-            errorDetails = String(errorData.error || (errorData.details ? JSON.stringify(errorData.details) : null) || errorData.message || errorDetails);
+            const specificError = errorData.error || (errorData.details ? JSON.stringify(errorData.details) : null);
+            errorDetails = String(specificError || errorData.message || errorDetails);
         } catch (e) {
             const errorText = await response.text().catch(() => "Could not retrieve error text.");
             if (errorText.toLowerCase().includes("<!doctype html>")) {
@@ -55,7 +60,7 @@ export function FailedAssignmentsList() {
   }, [fetchFailedAssignments]);
 
   return (
-    <Card className="shadow-lg">
+    <Card className={cn("shadow-lg", className)}>
       <CardHeader>
         <div className="flex items-center gap-2">
           <FileWarning className="h-6 w-6 text-destructive" />
@@ -76,7 +81,7 @@ export function FailedAssignmentsList() {
             <p className="text-xs text-muted-foreground">All clear for now!</p>
           </div>
         ) : (
-          <ScrollArea className="h-[300px] pr-4">
+          <ScrollArea className="h-[300px] pr-4"> {/* Adjusted height */}
             <ul className="space-y-3">
               {failedAssignments.map((item) => (
                 <li key={item.assignmentId} className="p-3 border rounded-md shadow-sm hover:shadow-md transition-shadow bg-card">
