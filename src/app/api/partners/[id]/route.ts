@@ -76,18 +76,32 @@ export async function DELETE(request: Request, context: { params: Params }) {
   const { id } = context.params;
 
   try {
-    const { error } = await supabase
+    const { error, count } = await supabase
       .from('delivery_partners')
-      .delete()
+      .delete({ count: 'exact' }) // Request the count of deleted rows
       .eq('id', id);
 
     if (error) {
+      // This could be an RLS violation or other database error
       return NextResponse.json({ 
-        message: `Failed to delete partner with ID ${id}. Please check server logs.`, 
-        error: `Supabase error: ${error.message} (Code: ${error.code})` 
+        message: `Failed to delete partner with ID ${id}. Please check server logs for details.`, 
+        error: `Supabase error: ${error.message}`,
+        details: String(error.details ?? ''),
+        code: error.code 
       }, { status: 500 });
     }
-    return NextResponse.json({ message: `Partner ${id} deleted successfully` });
+
+    if (count === 0) {
+      // No rows were deleted, meaning the partner ID was not found
+      return NextResponse.json({
+        message: `Partner with ID ${id} not found. No rows were deleted.`,
+        error: "Partner not found"
+      }, { status: 404 });
+    }
+
+    // If count > 0, deletion was successful
+    return NextResponse.json({ message: `Partner ${id} deleted successfully. ${count} row(s) affected.` });
+
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : 'An unexpected server error occurred during deletion.';
     return NextResponse.json({ message: "Server error during partner deletion.", error: errorMessage }, { status: 500 });
