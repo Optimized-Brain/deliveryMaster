@@ -1,13 +1,29 @@
 
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+// import { supabase } from '@/lib/supabase'; // Supabase logic bypassed for demo
 import type { Order, OrderStatus } from '@/lib/types';
+import { SAMPLE_ORDERS } from '@/lib/constants'; // Using sample data for demo
 
 // GET /api/orders
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const statusFilter = searchParams.get('status');
+  const statusFilter = searchParams.get('status') as OrderStatus | null;
 
+  // --- Demo mode: Use SAMPLE_ORDERS ---
+  let ordersToReturn = [...SAMPLE_ORDERS];
+
+  if (statusFilter) {
+    ordersToReturn = ordersToReturn.filter(order => order.status === statusFilter);
+  }
+  
+  // Sort by creationDate descending for consistency
+  ordersToReturn.sort((a, b) => new Date(b.creationDate).getTime() - new Date(a.creationDate).getTime());
+
+  return NextResponse.json(ordersToReturn);
+  // --- End Demo mode ---
+
+  /*
+  // --- Original Supabase logic ---
   let query = supabase.from('orders').select('*');
 
   if (statusFilter) {
@@ -36,14 +52,16 @@ export async function GET(request: Request) {
   }));
 
   return NextResponse.json(orders);
+  // --- End Original Supabase logic ---
+  */
 }
 
 // POST /api/orders - Placeholder for creating new orders if needed in the future
 export async function POST(request: Request) {
   // In a real application, you would add logic to create a new order in Supabase
   // For now, this is a placeholder
+  // If using dummy data, this might add to an in-memory store or just log
   const body = await request.json();
-  // If implementing, ensure to handle 'created_at' (likely set by Supabase default)
-  // and map back to 'creationDate' if needed.
-  return NextResponse.json({ message: 'Order creation endpoint hit', order: body }, { status: 201 });
+  console.log("POST /api/orders called with body (demo mode, no DB action):", body);
+  return NextResponse.json({ message: 'Order creation endpoint hit (demo mode)', order: body }, { status: 201 });
 }
