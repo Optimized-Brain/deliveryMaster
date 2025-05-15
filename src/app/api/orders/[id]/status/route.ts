@@ -1,36 +1,56 @@
 
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import type { OrderStatus, Order } from '@/lib/types';
+import type { OrderStatus, Order, Partner } from '@/lib/types';
 
 interface Params {
   id: string;
 }
 
-async function updatePartnerMetrics(partnerId: string, metric: 'completed_orders' | 'cancelled_orders' | 'current_load_decrement' | 'current_load_increment') {
+async function updatePartnerMetrics(
+  partnerId: string,
+  metricAction:
+    | { type: 'increment_load' }
+    | { type: 'decrement_load_generic' } // For general load decrement like issue reporting
+    | { type: 'order_delivered' }
+    | { type: 'order_cancelled' }
+) {
   const { data: partner, error: fetchError } = await supabase
     .from('delivery_partners')
     .select('current_load, completed_orders, cancelled_orders')
     .eq('id', partnerId)
     .single();
 
-  if (fetchError || !partner) {
-    return { success: false, message: `Failed to fetch partner ${partnerId} for metric update: ${fetchError?.message || 'Partner not found.'}` };
+  if (fetchError) {
+    return { success: false, message: `Failed to fetch partner ${partnerId} for metric update: ${fetchError.message}` };
+  }
+  if (!partner) {
+    return { success: false, message: `Partner ${partnerId} not found for metric update.` };
   }
 
-  const updatePayload: Partial<Record<keyof typeof partner, number>> = {};
-  if (metric === 'completed_orders') {
-    updatePayload.completed_orders = (partner.completed_orders || 0) + 1;
-    updatePayload.current_load = Math.max(0, (partner.current_load || 0) - 1);
-  } else if (metric === 'cancelled_orders') {
-    updatePayload.cancelled_orders = (partner.cancelled_orders || 0) + 1;
-    updatePayload.current_load = Math.max(0, (partner.current_load || 0) - 1); // Also decrement load if cancelled while assigned
-  } else if (metric === 'current_load_decrement') {
-    updatePayload.current_load = Math.max(0, (partner.current_load || 0) - 1);
-  } else if (metric === 'current_load_increment') {
-     updatePayload.current_load = (partner.current_load || 0) + 1;
-  }
+  const updatePayload: Partial<Pick<Partner, 'current_load' | 'completed_orders' | 'cancelled_orders'>> = {};
+  let actionDescription = "";
 
+  switch (metricAction.type) {
+    case 'increment_load':
+      updatePayload.current_load = (partner.current_load || 0) + 1;
+      actionDescription = "load incremented";
+      break;
+    case 'decrement_load_generic':
+      updatePayload.current_load = Math.max(0, (partner.current_load || 0) - 1);
+      actionDescription = "load decremented";
+      break;
+    case 'order_delivered':
+      updatePayload.completed_orders = (partner.completed_orders || 0) + 1;
+      updatePayload.current_load = Math.max(0, (partner.current_load || 0) - 1);
+      actionDescription = "completed_orders incremented, load decremented";
+      break;
+    case 'order_cancelled':
+      updatePayload.cancelled_orders = (partner.cancelled_orders || 0) + 1;
+      updatePayload.current_load = Math.max(0, (partner.current_load || 0) - 1);
+      actionDescription = "cancelled_orders incremented, load decremented";
+      break;
+  }
 
   if (Object.keys(updatePayload).length === 0) {
     return { success: true, message: 'No metric changes required for partner.' };
@@ -42,9 +62,9 @@ async function updatePartnerMetrics(partnerId: string, metric: 'completed_orders
     .eq('id', partnerId);
 
   if (updateError) {
-    return { success: false, message: `Failed to update partner ${partnerId} metrics: ${updateError.message}` };
+    return { success: false, message: `Failed to update partner ${partnerId.substring(0,8)}... metrics (${actionDescription}): ${updateError.message}` };
   }
-  return { success: true, message: `Partner ${partnerId.substring(0,8)}... metrics updated (${metric}).` };
+  return { success: true, message: `Partner ${partnerId.substring(0,8)}... metrics updated (${actionDescription}).` };
 }
 
 
@@ -65,29 +85,28 @@ export async function PUT(request: Request, context: { params: Params }) {
       return NextResponse.json({ message: `Invalid status: ${newOrderStatus}. Valid statuses are: ${validStatuses.join(', ')}` }, { status: 400 });
     }
 
-    // Fetch current order to get original assigned_to if status changes from assigned/picked
+    // Fetch current order to get original assigned_to if status changes that impact partner metrics
     let originalAssignedPartnerId: string | null = null;
-    if (newOrderStatus === 'delivered' || newOrderStatus === 'cancelled') {
-      const { data: currentOrderData, error: fetchCurrentOrderError } = await supabase
+    const { data: currentOrderData, error: fetchCurrentOrderError } = await supabase
         .from('orders')
         .select('assigned_to, status')
         .eq('id', orderId)
         .single();
 
-      if (fetchCurrentOrderError && fetchCurrentOrderError.code !== 'PGRST116') {
-        return NextResponse.json({ message: `Failed to fetch current order details: ${fetchCurrentOrderError.message}` }, { status: 500 });
-      }
-      if (currentOrderData) {
-        originalAssignedPartnerId = currentOrderData.assigned_to;
-      }
+    if (fetchCurrentOrderError && fetchCurrentOrderError.code !== 'PGRST116') { // PGRST116 = 0 rows, which is fine if order is new
+        return NextResponse.json({ message: `Critical error fetching current order details: ${fetchCurrentOrderError.message}` }, { status: 500 });
     }
+    if (currentOrderData) {
+        originalAssignedPartnerId = currentOrderData.assigned_to;
+    }
+
 
     // Update Order
     const orderUpdateData: Record<string, any> = { status: newOrderStatus as OrderStatus };
     if (newOrderStatus === 'assigned' && assignedPartnerId) {
       orderUpdateData.assigned_to = assignedPartnerId;
     } else if (newOrderStatus === 'pending' || newOrderStatus === 'cancelled') {
-      orderUpdateData.assigned_to = null;
+      orderUpdateData.assigned_to = null; // Clear assignment if cancelled or reverted to pending
     }
 
     const { data: updatedOrderData, error: orderUpdateError } = await supabase
@@ -98,11 +117,11 @@ export async function PUT(request: Request, context: { params: Params }) {
       .single();
 
     if (orderUpdateError) {
-      if (orderUpdateError.code === 'PGRST116') { // Order not found
+      if (orderUpdateError.code === 'PGRST116') {
         return NextResponse.json({ message: `Order with ID ${orderId} not found.` }, { status: 404 });
       }
       return NextResponse.json({
-        message: `Order update failed: ${orderUpdateError.message || 'Unknown Supabase error while updating order'}`,
+        message: `Order update failed: ${orderUpdateError.message || 'Unknown Supabase error while updating order'}. Supabase Code: ${orderUpdateError.code}`,
         error: orderUpdateError.message
       }, { status: 500 });
     }
@@ -113,55 +132,48 @@ export async function PUT(request: Request, context: { params: Params }) {
     let partnerMetricUpdateMessage = "";
     let assignmentLogMessage = "";
 
+
     // Handle assignments table and partner metrics
     if (newOrderStatus === 'assigned' && assignedPartnerId) {
-      // Log new assignment
       const assignmentLogData = {
         order_id: orderId,
         partner_id: assignedPartnerId,
-        status: 'active', // Default status for a new assignment
+        status: 'success', // Default to 'success' to satisfy NOT NULL and CHECK constraints.
       };
       const { data: assignmentData, error: assignmentInsertError } = await supabase
         .from('assignments')
         .insert(assignmentLogData)
-        .select('*')
+        .select('*') 
         .single();
 
-      if (assignmentInsertError) {
+      if (assignmentInsertError || !assignmentData) {
         return NextResponse.json({
-          message: `Order status updated to '${newOrderStatus}', but FAILED to log assignment record: ${assignmentInsertError.message}. This is a critical issue. Supabase Code: ${assignmentInsertError.code}`,
-          error: assignmentInsertError.message,
-          details: String(assignmentInsertError.details ?? '')
+          message: `Order status updated to '${newOrderStatus}', but FAILED to create assignment record: ${assignmentInsertError?.message || 'No data returned after insert.'}. This is a critical issue. Supabase Code: ${assignmentInsertError?.code}`,
+          error: assignmentInsertError?.message || 'Failed to confirm assignment record creation (no data returned).'
         }, { status: 500 });
-      } else if (!assignmentData) {
-         return NextResponse.json({
-              message: `Order status updated to '${newOrderStatus}', but FAILED to confirm assignment record creation. This is a critical issue.`,
-              error: 'Failed to confirm assignment record creation (no data returned).'
-          }, { status: 500 });
       }
       assignmentLogMessage = `Assignment successfully logged (ID: ${assignmentData.id}).`;
 
-      // Increment partner load
-      const partnerLoadResult = await updatePartnerMetrics(assignedPartnerId, 'current_load_increment');
-      partnerMetricUpdateMessage = partnerLoadResult.message;
-      if (!partnerLoadResult.success) { // If critical, might return 500 or just add warning
-         assignmentLogMessage += ` Warning: ${partnerMetricUpdateMessage}`;
+      const partnerLoadResult = await updatePartnerMetrics(assignedPartnerId, { type: 'increment_load' });
+      if (!partnerLoadResult.success) {
+        return NextResponse.json({ message: `Order assigned and logged, but ${partnerLoadResult.message}`, error: partnerLoadResult.message }, { status: 500 });
       }
-
+      partnerMetricUpdateMessage = partnerLoadResult.message;
 
     } else if (newOrderStatus === 'delivered' && originalAssignedPartnerId) {
-      // Update partner metrics for completed order
-      const partnerMetricsResult = await updatePartnerMetrics(originalAssignedPartnerId, 'completed_orders');
+      const partnerMetricsResult = await updatePartnerMetrics(originalAssignedPartnerId, { type: 'order_delivered' });
+      if (!partnerMetricsResult.success) {
+        return NextResponse.json({ message: `Order marked delivered, but ${partnerMetricsResult.message}`, error: partnerMetricsResult.message }, { status: 500 });
+      }
       partnerMetricUpdateMessage = partnerMetricsResult.message;
-      // Update assignment status to 'success'
+      
       const { error: updateAssignmentError } = await supabase
         .from('assignments')
         .update({ status: 'success' })
         .eq('order_id', orderId)
-        .eq('partner_id', originalAssignedPartnerId) // Be specific if order could be reassigned
+        .eq('partner_id', originalAssignedPartnerId) 
         .order('created_at', { ascending: false })
-        .limit(1)
-        .select();
+        .limit(1); // Update latest assignment for this order-partner pair
       if (updateAssignmentError) {
         assignmentLogMessage = `Warning: Failed to update assignment record to success: ${updateAssignmentError.message}.`;
       } else {
@@ -169,18 +181,19 @@ export async function PUT(request: Request, context: { params: Params }) {
       }
 
     } else if (newOrderStatus === 'cancelled' && originalAssignedPartnerId) {
-      // Update partner metrics for cancelled order
-      const partnerMetricsResult = await updatePartnerMetrics(originalAssignedPartnerId, 'cancelled_orders');
+      const partnerMetricsResult = await updatePartnerMetrics(originalAssignedPartnerId, { type: 'order_cancelled' });
+       if (!partnerMetricsResult.success) {
+        return NextResponse.json({ message: `Order marked cancelled, but ${partnerMetricsResult.message}`, error: partnerMetricsResult.message }, { status: 500 });
+      }
       partnerMetricUpdateMessage = partnerMetricsResult.message;
-      // Update assignment status to 'failed'
+
       const { error: updateAssignmentError } = await supabase
         .from('assignments')
         .update({ status: 'failed', reason: 'Order Cancelled' })
         .eq('order_id', orderId)
         .eq('partner_id', originalAssignedPartnerId)
         .order('created_at', { ascending: false })
-        .limit(1)
-        .select();
+        .limit(1); 
       if (updateAssignmentError) {
         assignmentLogMessage = `Warning: Failed to update assignment record to failed (cancelled): ${updateAssignmentError.message}.`;
       } else {
@@ -193,7 +206,7 @@ export async function PUT(request: Request, context: { params: Params }) {
       customerName: updatedOrderData.customer_name,
       customerPhone: updatedOrderData.customer_phone || undefined,
       items: updatedOrderData.items || [],
-      status: updatedOrderData.status as OrderStatus,
+      status: updatedOrderData.status.toLowerCase() as OrderStatus,
       area: updatedOrderData.area,
       creationDate: updatedOrderData.created_at,
       deliveryAddress: updatedOrderData.customer_address,
