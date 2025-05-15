@@ -19,8 +19,6 @@ export async function GET(request: Request) {
         query = query.eq('status', statusFilter);
       } else {
         console.warn(`Invalid status filter received: ${statusFilter}. Fetching all partners.`);
-        // Optionally, you could return a 400 error for an invalid status
-        // return NextResponse.json({ message: `Invalid status filter: ${statusFilter}` }, { status: 400 });
       }
     }
     
@@ -30,12 +28,14 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error('Error fetching partners from Supabase:', error);
-      return NextResponse.json({ message: 'Error fetching partners', error: error.message, details: error.details }, { status: 500 });
+      return NextResponse.json({ 
+        message: 'Error fetching partners from Supabase.', 
+        error: error.message, 
+        details: String(error.details ?? '') 
+      }, { status: 500 });
     }
 
     if (!data) {
-      // This case might occur if RLS prevents access but doesn't throw an error,
-      // or if the table is empty and a filter results in no matches.
       return NextResponse.json([]);
     }
 
@@ -45,11 +45,11 @@ export async function GET(request: Request) {
       email: p.email,
       phone: p.phone,
       status: p.status as PartnerStatus,
-      assignedAreas: p.areas || [], // maps 'areas' from DB to 'assignedAreas'
+      assignedAreas: p.areas || [],
       shiftStart: p.shift_start, 
       shiftEnd: p.shift_end,     
-      currentLoad: p.current_load ?? 0, // Default to 0 if null
-      rating: p.rating ?? 0, // Default to 0 if null
+      currentLoad: p.current_load ?? 0,
+      rating: p.rating ?? 0,
       avatarUrl: p.avatar_url,
       registrationDate: p.created_at, 
     }));
@@ -59,7 +59,10 @@ export async function GET(request: Request) {
   } catch (e) {
     console.error('Unexpected error in GET /api/partners:', e);
     const errorMessage = e instanceof Error ? e.message : 'An unexpected server error occurred.';
-    return NextResponse.json({ message: 'Failed to fetch partners due to server error', error: errorMessage }, { status: 500 });
+    return NextResponse.json({ 
+      message: 'Unexpected server error while fetching partners.', 
+      error: String(errorMessage) 
+    }, { status: 500 });
   }
 }
 
@@ -87,7 +90,6 @@ export async function POST(request: Request) {
       current_load: body.currentLoad ?? 0,
       rating: body.rating ?? 0,
       avatar_url: body.avatarUrl,
-      // created_at and updated_at are typically handled by Supabase defaults/triggers
     };
 
     const { data, error } = await supabase
@@ -98,7 +100,11 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error('Error creating partner in Supabase:', error);
-      return NextResponse.json({ message: 'Error creating partner', error: error.message, details: error.details }, { status: 500 });
+      return NextResponse.json({ 
+        message: 'Error creating partner in Supabase.', 
+        error: error.message, 
+        details: String(error.details ?? '') 
+      }, { status: 500 });
     }
     
     if (!data) {
@@ -124,7 +130,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Partner created successfully', partner: createdPartner }, { status: 201 });
   } catch (e) {
     console.error('Unexpected error in POST /api/partners:', e);
-    const errorMessage = e instanceof Error ? e.message : 'Invalid request body or unexpected server error';
-    return NextResponse.json({ message: 'Failed to create partner due to server error', error: errorMessage }, { status: 400 });
+    const errorMessage = e instanceof Error ? e.message : 'Invalid request body or unexpected server error.';
+    // Changed status to 500 for unexpected server errors
+    return NextResponse.json({ 
+      message: 'Failed to create partner due to unexpected server error.', 
+      error: String(errorMessage) 
+    }, { status: 500 });
   }
 }
