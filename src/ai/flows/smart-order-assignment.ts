@@ -58,11 +58,11 @@ Based on the above information:
 2. If a suitable partner is found:
    - Set 'suggestionMade' to true.
    - Set 'suggestedPartnerId' to the ID of that partner.
-   - Provide a clear 'reason' explaining why this partner is the best choice.
+   - Provide a clear 'reason' explaining why this partner is the best choice. This reason will be shown to the user.
 3. If no suitable partner is found (e.g., no partners in the area, all eligible partners are at maximum load or unavailable):
    - Set 'suggestionMade' to false.
    - Do NOT set 'suggestedPartnerId'.
-   - Provide a clear 'reason' explaining why no suitable partner could be identified (e.g., "No partners available in the {{{orderLocation}}} area," or "All partners in {{{orderLocation}}} are currently at maximum load or unavailable.").
+   - Provide a clear, user-visible 'reason' explaining in detail why no suitable partner could be identified. This reason will be shown directly to the user. For example: "No partners are currently available in the '{{{orderLocation}}}' area," or "All potentially suitable partners in '{{{orderLocation}}}' are at maximum load or otherwise unavailable."
 
 Return your response in JSON format.`,
 });
