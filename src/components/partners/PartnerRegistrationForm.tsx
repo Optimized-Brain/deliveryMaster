@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -10,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AVAILABLE_AREAS, PARTNER_STATUSES } from '@/lib/constants';
+import { PARTNER_STATUSES } from '@/lib/constants'; // AVAILABLE_AREAS removed, assignedAreas is free text
 import { useToast } from '@/hooks/use-toast';
 import type { PartnerStatus } from '@/lib/types';
 
@@ -18,14 +19,19 @@ const partnerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
   phone: z.string().min(10, "Phone number must be at least 10 digits"),
-  status: z.enum(PARTNER_STATUSES as [PartnerStatus, ...PartnerStatus[]]), // Ensure Zod enum gets a non-empty array type
+  status: z.enum(PARTNER_STATUSES as [PartnerStatus, ...PartnerStatus[]]),
   assignedAreas: z.string().min(1, "At least one area is required (comma-separated)"),
   shiftSchedule: z.string().min(5, "Shift schedule is required"),
+  // avatarUrl could be added here if desired
 });
 
 type PartnerFormData = z.infer<typeof partnerSchema>;
 
-export function PartnerRegistrationForm() {
+interface PartnerRegistrationFormProps {
+  onPartnerRegistered?: () => void;
+}
+
+export function PartnerRegistrationForm({ onPartnerRegistered }: PartnerRegistrationFormProps) {
   const { toast } = useToast();
   const form = useForm<PartnerFormData>({
     resolver: zodResolver(partnerSchema),
@@ -39,15 +45,35 @@ export function PartnerRegistrationForm() {
     },
   });
 
-  const onSubmit = (data: PartnerFormData) => {
-    console.log("New partner data:", data);
-    // Here you would typically send the data to your backend
-    toast({
-      title: "Partner Registered",
-      description: `${data.name} has been successfully registered.`,
-      variant: "default", // Use 'default' which uses primary color for positive feedback
-    });
-    form.reset(); // Reset form after submission
+  const onSubmit = async (data: PartnerFormData) => {
+    try {
+      const response = await fetch('/api/partners', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to register partner');
+      }
+
+      const result = await response.json();
+      toast({
+        title: "Partner Registered",
+        description: `${result.partner.name} has been successfully registered.`,
+        variant: "default",
+      });
+      form.reset();
+      onPartnerRegistered?.(); // Callback to parent component
+    } catch (error) {
+      console.error("Partner registration failed:", error);
+      toast({
+        title: "Registration Failed",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -129,12 +155,11 @@ export function PartnerRegistrationForm() {
               name="assignedAreas"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Assigned Areas</FormLabel>
+                  <FormLabel>Assigned Areas (comma-separated)</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Downtown, North End (comma-separated)" {...field} />
+                    <Input placeholder="e.g., Downtown, North End" {...field} />
                   </FormControl>
                   <FormMessage />
-                  {/* TODO: Could be enhanced with a multi-select from AVAILABLE_AREAS */}
                 </FormItem>
               )}
             />

@@ -1,31 +1,69 @@
+
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PartnerTable } from "@/components/partners/PartnerTable";
 import { PartnerRegistrationForm } from "@/components/partners/PartnerRegistrationForm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SAMPLE_PARTNERS } from "@/lib/constants";
+// import { SAMPLE_PARTNERS } from "@/lib/constants"; // Will fetch from API
 import type { Partner } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function PartnersPage() {
   const { toast } = useToast();
-  const [partners, setPartners] = useState<Partner[]>(SAMPLE_PARTNERS); // In real app, this would be fetched and updatable
+  const [partners, setPartners] = useState<Partner[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>("list");
 
+  const fetchPartners = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/partners');
+      if (!response.ok) {
+        throw new Error('Failed to fetch partners');
+      }
+      const data: Partner[] = await response.json();
+      setPartners(data);
+    } catch (error) {
+      console.error("Error fetching partners:", error);
+      toast({ title: "Error", description: (error as Error).message || "Could not load partners.", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    fetchPartners();
+  }, [fetchPartners]);
 
   const handleEditPartner = (partnerId: string) => {
     toast({ title: "Edit Partner", description: `Editing partner ${partnerId}` });
     // Logic to show edit form or navigate
+    // For a real app, you might fetch the partner data and populate an edit form.
   };
 
-  const handleDeletePartner = (partnerId: string) => {
+  const handleDeletePartner = async (partnerId: string) => {
     if (window.confirm("Are you sure you want to delete this partner?")) {
-      setPartners(prev => prev.filter(p => p.id !== partnerId));
-      toast({ title: "Partner Deleted", description: `Partner ${partnerId} has been deleted.`, variant: "destructive" });
+      try {
+        const response = await fetch(`/api/partners/${partnerId}`, { method: 'DELETE' });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to delete partner');
+        }
+        setPartners(prev => prev.filter(p => p.id !== partnerId));
+        toast({ title: "Partner Deleted", description: `Partner ${partnerId} has been deleted.`, variant: "default" });
+      } catch (error) {
+        console.error("Error deleting partner:", error);
+        toast({ title: "Error", description: (error as Error).message, variant: "destructive" });
+      }
     }
+  };
+
+  const handlePartnerRegistered = () => {
+    fetchPartners(); // Refetch partners list
+    setActiveTab("list"); // Switch to list view
   };
 
   return (
@@ -45,14 +83,21 @@ export default function PartnersPage() {
           <TabsTrigger value="register">Register New Partner</TabsTrigger>
         </TabsList>
         <TabsContent value="list" className="mt-6">
-          <PartnerTable 
-            partners={partners} 
-            onEditPartner={handleEditPartner} 
-            onDeletePartner={handleDeletePartner} 
-          />
+          {isLoading ? (
+            <div className="flex justify-center items-center py-10">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="ml-2">Loading partners...</p>
+            </div>
+          ) : (
+            <PartnerTable 
+              partners={partners} 
+              onEditPartner={handleEditPartner} 
+              onDeletePartner={handleDeletePartner} 
+            />
+          )}
         </TabsContent>
         <TabsContent value="register" className="mt-6">
-          <PartnerRegistrationForm />
+          <PartnerRegistrationForm onPartnerRegistered={handlePartnerRegistered} />
         </TabsContent>
       </Tabs>
     </div>

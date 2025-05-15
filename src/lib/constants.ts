@@ -11,6 +11,9 @@ export const NAV_LINKS: NavItem[] = [
   { href: '/assignment', label: 'Smart Assignment', icon: Shuffle },
 ];
 
+// TODO: Replace SAMPLE_PARTNERS with data fetched from Supabase /api/partners
+// This sample data is still used by SmartAssignmentForm.tsx and potentially other places.
+/*
 export const SAMPLE_PARTNERS: Partner[] = [
   {
     id: 'partner-001',
@@ -25,60 +28,13 @@ export const SAMPLE_PARTNERS: Partner[] = [
     avatarUrl: 'https://placehold.co/100x100.png',
     registrationDate: new Date('2023-01-15T10:00:00Z').toISOString(),
   },
-  {
-    id: 'partner-002',
-    name: 'Jane Smith',
-    email: 'jane.smith@example.com',
-    phone: '555-5678',
-    status: 'inactive' as PartnerStatus,
-    assignedAreas: ['Westside'],
-    shiftSchedule: 'Weekend 10am-6pm',
-    currentLoad: 0,
-    rating: 4.5,
-    avatarUrl: 'https://placehold.co/100x100.png',
-    registrationDate: new Date('2023-03-20T14:30:00Z').toISOString(),
-  },
-  {
-    id: 'partner-003',
-    name: 'Mike Johnson',
-    email: 'mike.johnson@example.com',
-    phone: '555-8765',
-    status: 'on-break' as PartnerStatus,
-    assignedAreas: ['Downtown', 'Eastside'],
-    shiftSchedule: 'Mon-Wed 12pm-8pm',
-    currentLoad: 1,
-    rating: 4.2,
-    avatarUrl: 'https://placehold.co/100x100.png',
-    registrationDate: new Date('2023-05-10T09:00:00Z').toISOString(),
-  },
-    {
-    id: 'partner-004',
-    name: 'Alice Brown',
-    email: 'alice.brown@example.com',
-    phone: '555-4321',
-    status: 'active' as PartnerStatus,
-    assignedAreas: ['North End', 'Suburbia'],
-    shiftSchedule: 'Tue-Sat 11am-7pm',
-    currentLoad: 3,
-    rating: 4.9,
-    avatarUrl: 'https://placehold.co/100x100.png',
-    registrationDate: new Date('2023-02-01T11:00:00Z').toISOString(),
-  },
-  {
-    id: 'partner-005',
-    name: 'Robert Davis',
-    email: 'robert.davis@example.com',
-    phone: '555-9876',
-    status: 'active' as PartnerStatus,
-    assignedAreas: ['Downtown', 'Financial District'],
-    shiftSchedule: 'Mon-Fri 8am-4pm',
-    currentLoad: 1,
-    rating: 4.6,
-    avatarUrl: 'https://placehold.co/100x100.png',
-    registrationDate: new Date('2023-04-05T16:00:00Z').toISOString(),
-  },
+  // ... other sample partners
 ];
+*/
 
+// TODO: Replace SAMPLE_ORDERS with data fetched from Supabase /api/orders
+// This sample data is still used by SmartAssignmentForm.tsx, OrdersPage.tsx (initially), and potentially other places.
+/*
 export const SAMPLE_ORDERS: Order[] = [
   {
     id: 'order-101',
@@ -86,86 +42,42 @@ export const SAMPLE_ORDERS: Order[] = [
     items: [{ name: 'Pizza', quantity: 1 }, { name: 'Soda', quantity: 2 }],
     status: 'pending' as OrderStatus,
     area: 'Downtown',
-    creationDate: '2024-05-15T10:30:00Z', // Static ISO string
+    creationDate: '2024-05-15T10:30:00Z',
     deliveryAddress: '123 Main St, Downtown',
     orderValue: 25.99,
   },
-  {
-    id: 'order-102',
-    customerName: 'Bob The Builder',
-    items: [{ name: 'Groceries', quantity: 10 }],
-    status: 'assigned' as OrderStatus,
-    area: 'North End',
-    creationDate: '2024-05-15T09:30:00Z', // Static ISO string
-    deliveryAddress: '456 Oak Ave, North End',
-    assignedPartnerId: 'partner-001',
-    orderValue: 75.50,
-  },
-  {
-    id: 'order-103',
-    customerName: 'Charlie Brown',
-    items: [{ name: 'Electronics', quantity: 1 }],
-    status: 'in-transit' as OrderStatus,
-    area: 'Westside',
-    creationDate: '2024-05-12T14:00:00Z', // Static ISO string
-    deliveryAddress: '789 Pine Ln, Westside',
-    assignedPartnerId: 'partner-002',
-    orderValue: 199.99,
-  },
-  {
-    id: 'order-104',
-    customerName: 'Diana Prince',
-    items: [{ name: 'Books', quantity: 3 }],
-    status: 'delivered' as OrderStatus,
-    area: 'Eastside',
-    creationDate: '2024-05-10T18:45:00Z', // Static ISO string
-    deliveryAddress: '321 Elm Rd, Eastside',
-    assignedPartnerId: 'partner-003',
-    orderValue: 45.00,
-  },
-    {
-    id: 'order-105',
-    customerName: 'Edward Scissorhands',
-    items: [{ name: 'Flowers', quantity: 1 }],
-    status: 'pending' as OrderStatus,
-    area: 'Suburbia',
-    creationDate: '2024-05-15T11:00:00Z', // Static ISO string
-    deliveryAddress: '567 Willow Dr, Suburbia',
-    orderValue: 35.00,
-  },
-  {
-    id: 'order-106',
-    customerName: 'Fiona Gallagher',
-    items: [{ name: 'Takeout Food', quantity: 4 }],
-    status: 'cancelled' as OrderStatus,
-    area: 'Downtown',
-    creationDate: '2024-05-14T12:15:00Z', // Static ISO string
-    deliveryAddress: '890 Maple Ct, Downtown',
-    orderValue: 60.25,
-  },
+  // ... other sample orders
 ];
+*/
+// Fallback sample data for components that might still rely on it during transition
+export const SAMPLE_PARTNERS: Partner[] = []; // Empty array, actual data should be fetched
+export const SAMPLE_ORDERS: Order[] = []; // Empty array, actual data should be fetched
+
 
 export const DASHBOARD_METRICS: Metric[] = [
   {
     id: 'metric-partners',
     title: 'Total Active Partners',
-    value: SAMPLE_PARTNERS.filter(p => p.status === 'active').length,
+    // value: SAMPLE_PARTNERS.filter(p => p.status === 'active').length, // Old calculation
+    value: "N/A", // TODO: Fetch this from API / Supabase
     icon: Users,
-    change: '+2 this week',
-    changeType: 'positive',
+    change: '...', // TODO: Calculate or fetch
+    changeType: 'neutral',
   },
   {
     id: 'metric-rating',
     title: 'Average Partner Rating',
-    value: (SAMPLE_PARTNERS.reduce((sum, p) => sum + p.rating, 0) / SAMPLE_PARTNERS.length).toFixed(1),
+    // value: (SAMPLE_PARTNERS.reduce((sum, p) => sum + p.rating, 0) / (SAMPLE_PARTNERS.length || 1)).toFixed(1), // Old calculation
+    value: "N/A", // TODO: Fetch this from API / Supabase
     icon: Star,
-    change: '+0.1',
-    changeType: 'positive',
+    change: '...', // TODO: Calculate or fetch
+    changeType: 'neutral',
   },
   {
     id: 'metric-orders',
     title: 'Pending Orders',
-    value: SAMPLE_ORDERS.filter(o => o.status === 'pending').length,
+    // value: SAMPLE_ORDERS.filter(o => o.status === 'pending').length, // Old calculation
+    value: "N/A", // TODO: Fetch this from API / Supabase
     icon: ListOrdered,
     changeType: 'neutral',
   },
