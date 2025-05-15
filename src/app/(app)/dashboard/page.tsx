@@ -4,11 +4,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { MetricsGrid } from "@/components/dashboard/MetricsGrid";
 import { RecentActivityChart } from "@/components/dashboard/RecentActivityChart";
-import { FailedAssignmentsList } from "@/components/dashboard/FailedAssignmentsList"; // Import new component
+import { FailedAssignmentsList } from "@/components/dashboard/FailedAssignmentsList";
 import { DASHBOARD_METRICS_CONFIG } from "@/lib/constants";
 import type { Metric, Order } from "@/lib/types";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import Image from "next/image";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
@@ -42,7 +41,6 @@ export default function DashboardPage() {
       const totalOrders = fetchedOrders.length;
       const pendingOrdersCount = fetchedPendingOrders.length;
 
-      // Updated to count all delivered orders (no time restriction)
       const totalDeliveredOrders = fetchedOrders.filter(
         order => order.status === 'delivered'
       ).length;
@@ -53,7 +51,6 @@ export default function DashboardPage() {
       setMetrics(prevMetrics => prevMetrics.map(metric => {
         if (metric.id === 'metric-total-orders') return { ...metric, value: totalOrders };
         if (metric.id === 'metric-pending-orders') return { ...metric, value: pendingOrdersCount };
-        // Updated metric ID and value
         if (metric.id === 'metric-delivered-orders') return { ...metric, title: "Total Delivered Orders", value: totalDeliveredOrders }; 
         if (metric.id === 'metric-avg-order-value') return { ...metric, value: `₹${avgOrderValue.toFixed(2)}` };
         return { ...metric, value: "N/A" }; 
@@ -121,40 +118,11 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>System Status</CardTitle>
-            <CardDescription>Current operational status.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Order Processing</span>
-              <span className="font-semibold text-emerald-500">Operational</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Partner Network</span>
-              <span className="font-semibold text-emerald-500">Healthy</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">AI Assignment</span>
-              <span className="font-semibold text-emerald-500">Active</span>
-            </div>
-             <Image 
-                src="https://placehold.co/600x400.png" 
-                alt="System status illustration"
-                width={600}
-                height={400}
-                className="rounded-md mt-4"
-                data-ai-hint="server gears" 
-              />
-          </CardContent>
-        </Card>
-      </div>
-      
-      {/* New Section for Failed Assignments */}
-      <div className="grid grid-cols-1 gap-6">
+        {/* The FailedAssignmentsList component is now placed here, replacing the old System Status card */}
         <FailedAssignmentsList />
       </div>
+      
+      {/* The separate row for FailedAssignmentsList has been removed */}
     </div>
   );
 }
