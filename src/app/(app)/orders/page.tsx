@@ -4,10 +4,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { OrderFilters } from "@/components/orders/OrderFilters";
 import { OrderTable } from "@/components/orders/OrderTable";
+import { OrderCreationForm } from "@/components/orders/OrderCreationForm"; // Import new form
 import type { Order, OrderStatus } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { Loader2, PlusCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button'; // Import Button
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"; // Import Dialog components
 
 export default function OrdersPage() {
   const { toast } = useToast();
@@ -15,6 +25,7 @@ export default function OrdersPage() {
   const [allOrders, setAllOrders] = useState<Order[]>([]); 
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCreateOrderDialogOpen, setIsCreateOrderDialogOpen] = useState(false);
 
   const fetchOrders = useCallback(async () => {
     setIsLoading(true);
@@ -25,12 +36,16 @@ export default function OrdersPage() {
         try {
           const errorText = await response.text();
           console.error("Raw error response from /api/orders:", errorText);
-          const errorData = JSON.parse(errorText); // Attempt to parse as JSON
-          errorMessage = errorData.error || errorData.message || errorMessage;
+          if (errorText.startsWith("<!DOCTYPE html>")) {
+            errorMessage = `Failed to fetch orders. Server returned an HTML error page (status: ${response.status}). Check server logs.`;
+          } else {
+             const errorData = JSON.parse(errorText); // Attempt to parse as JSON
+             errorMessage = errorData.error || errorData.message || errorMessage;
+          }
         } catch (jsonParseError) {
           // Failed to parse, means server likely sent HTML or non-JSON
           console.error("Failed to parse JSON error response from fetching orders. Server might have sent HTML.", jsonParseError);
-          errorMessage = `Failed to fetch orders. Server returned a non-JSON response (status: ${response.status}). Check server logs.`;
+          errorMessage = `Failed to fetch orders. Server returned a non-JSON response (status: ${response.status}). Check server logs for the underlying error (e.g., environment variables).`;
         }
         throw new Error(errorMessage);
       }
@@ -87,10 +102,31 @@ export default function OrdersPage() {
     router.push(`/assignment?orderId=${orderId}`);
   };
 
+  const handleOrderCreated = () => {
+    fetchOrders(); // Refresh the list
+    setIsCreateOrderDialogOpen(false); // Close the dialog
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Manage Orders</h1>
+        <Dialog open={isCreateOrderDialogOpen} onOpenChange={setIsCreateOrderDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <PlusCircle className="mr-2 h-4 w-4" /> Add New Order
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[525px]">
+            <DialogHeader>
+              <DialogTitle>Add New Order</DialogTitle>
+              <DialogDescription>
+                Fill in the details below to create a new order.
+              </DialogDescription>
+            </DialogHeader>
+            <OrderCreationForm onOrderCreated={handleOrderCreated} />
+          </DialogContent>
+        </Dialog>
       </div>
       
       <OrderFilters onFilterChange={handleFilterChange} onClearFilters={handleClearFilters} />
