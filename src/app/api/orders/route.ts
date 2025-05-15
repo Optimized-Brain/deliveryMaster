@@ -6,42 +6,55 @@ import { z } from 'zod';
 
 // GET /api/orders
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const statusFilter = searchParams.get('status') as OrderStatus | null;
-  const assignedPartnerIdFilter = searchParams.get('assignedPartnerId');
+  try {
+    const { searchParams } = new URL(request.url);
+    const statusFilter = searchParams.get('status') as OrderStatus | null;
+    const assignedPartnerIdFilter = searchParams.get('assignedPartnerId');
 
-  let query = supabase.from('orders').select('id, customer_name, customer_phone, items, status, area, created_at, customer_address, assigned_to, total_amount');
+    let query = supabase.from('orders').select('id, customer_name, customer_phone, items, status, area, created_at, customer_address, assigned_to, total_amount');
 
-  if (statusFilter) {
-    query = query.eq('status', statusFilter);
+    if (statusFilter) {
+      query = query.eq('status', statusFilter);
+    }
+
+    if (assignedPartnerIdFilter) {
+      query = query.eq('assigned_to', assignedPartnerIdFilter);
+    }
+
+    query = query.order('created_at', { ascending: false });
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Supabase error fetching orders:', error);
+      return NextResponse.json({ message: 'Error fetching orders from Supabase.', error: error.message, details: error.details }, { status: 500 });
+    }
+
+    if (!data) {
+      // If data is null even without an error (e.g., RLS), return empty array
+      return NextResponse.json([]);
+    }
+
+    const orders: Order[] = data.map((o: any) => ({
+      id: o.id,
+      customerName: o.customer_name,
+      customerPhone: o.customer_phone || undefined, // Ensure optional fields are handled
+      items: o.items || [], // Default to empty array if items is null/undefined
+      status: o.status.toLowerCase() as OrderStatus,
+      area: o.area,
+      creationDate: o.created_at,
+      deliveryAddress: o.customer_address,
+      assignedPartnerId: o.assigned_to,
+      orderValue: o.total_amount,
+    }));
+
+    return NextResponse.json(orders);
+
+  } catch (e: unknown) {
+    const errorMessage = e instanceof Error ? e.message : 'An unexpected error occurred while fetching orders.';
+    console.error('Unexpected error in GET /api/orders:', e);
+    return NextResponse.json({ message: 'Server error fetching orders.', error: errorMessage }, { status: 500 });
   }
-
-  if (assignedPartnerIdFilter) {
-    query = query.eq('assigned_to', assignedPartnerIdFilter);
-  }
-
-  query = query.order('created_at', { ascending: false });
-
-  const { data, error } = await query;
-
-  if (error) {
-    return NextResponse.json({ message: 'Error fetching orders', error: error.message }, { status: 500 });
-  }
-
-  const orders: Order[] = (data || []).map((o: any) => ({
-    id: o.id,
-    customerName: o.customer_name,
-    customerPhone: o.customer_phone,
-    items: o.items || [],
-    status: o.status.toLowerCase() as OrderStatus,
-    area: o.area,
-    creationDate: o.created_at,
-    deliveryAddress: o.customer_address,
-    assignedPartnerId: o.assigned_to,
-    orderValue: o.total_amount,
-  }));
-
-  return NextResponse.json(orders);
 }
 
 const phoneRegex = new RegExp(
@@ -87,6 +100,7 @@ export async function POST(request: Request) {
       .single();
 
     if (error) {
+      console.error('Supabase error creating order:', error);
       return NextResponse.json({
         message: 'Error creating order in Supabase.',
         error: error.message,
@@ -95,13 +109,15 @@ export async function POST(request: Request) {
     }
 
     if (!data) {
+      // This case should ideally be caught by the error above, but as a safeguard
+      console.error('Failed to create order, no data returned from Supabase after insert.');
       return NextResponse.json({ message: 'Failed to create order, no data returned. Possible RLS issue or misconfiguration.' }, { status: 500 });
     }
 
     const createdOrder: Order = {
       id: data.id,
       customerName: data.customer_name,
-      customerPhone: data.customer_phone,
+      customerPhone: data.customer_phone || undefined,
       items: data.items || [],
       status: data.status.toLowerCase() as OrderStatus,
       area: data.area,
@@ -115,11 +131,14 @@ export async function POST(request: Request) {
 
   } catch (e: unknown) {
     let errorMessage = 'Invalid request body or unexpected server error.';
-    if (e instanceof Error && e.name === 'SyntaxError' && e.message.includes('JSON')) {
+     if (e instanceof SyntaxError && e.message.includes('JSON')) { // Specifically catch JSON parsing errors from request body
         errorMessage = 'Invalid request body: Malformed JSON.';
+        console.error('Malformed JSON in POST /api/orders request body:', e);
+        return NextResponse.json({ message: errorMessage, error: e.message }, { status: 400 });
     } else if (e instanceof Error) {
         errorMessage = e.message;
     }
+    console.error('Unexpected error in POST /api/orders:', e);
     return NextResponse.json({
       message: 'Failed to create order due to unexpected server error.',
       error: String(errorMessage)

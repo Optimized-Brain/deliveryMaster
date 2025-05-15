@@ -46,8 +46,6 @@ export default function OrdersPage() {
   useEffect(() => {
     const partnerIdFromUrl = searchParams.get('assignedPartnerId');
     setUrlPartnerFilterId(partnerIdFromUrl);
-    // If a partner filter is applied via URL, we might want to reset UI filters
-    // or indicate that a special filter is active. For now, just store it.
   }, [searchParams]);
 
 
@@ -59,7 +57,6 @@ export default function OrdersPage() {
         let errorMessage = `Failed to fetch orders (status: ${response.status})`;
         try {
           const errorText = await response.text();
-          console.error("Raw error response from /api/orders:", errorText);
           if (errorText.startsWith("<!DOCTYPE html>")) {
             errorMessage = `Failed to fetch orders. Server returned an HTML error page (status: ${response.status}). Check server logs.`;
           } else {
@@ -67,14 +64,12 @@ export default function OrdersPage() {
              errorMessage = errorData.error || errorData.message || errorMessage;
           }
         } catch (jsonParseError) {
-          console.error("Failed to parse JSON error response from fetching orders. Server might have sent HTML.", jsonParseError);
           errorMessage = `Failed to fetch orders. Server returned a non-JSON response (status: ${response.status}). Check server logs for the underlying error (e.g., environment variables).`;
         }
         throw new Error(errorMessage);
       }
       const data: Order[] = await response.json();
       setAllOrders(data);
-      // Initial filtering will be handled by the useEffect below
     } catch (error) {
       console.error("Error fetching orders:", error);
       toast({
@@ -82,8 +77,7 @@ export default function OrdersPage() {
         description: (error as Error).message,
         variant: "destructive",
       });
-      setAllOrders([]);
-      setFilteredOrders([]);
+      setAllOrders([]); // Ensure allOrders is empty on error
     } finally {
       setIsLoading(false);
     }
@@ -124,11 +118,9 @@ export default function OrdersPage() {
 
 
   const handleFilterChange = (filters: { status?: OrderStatus | "all"; area?: string | "all"; date?: Date }) => {
-    // When UI filters change, we clear any URL-based partner filter to avoid confusion,
-    // unless we want complex combined filtering. For simplicity, UI filters override URL partner filter for now.
     if (urlPartnerFilterId) {
-        setUrlPartnerFilterId(null); // Clear URL partner filter if UI filters are used
-        router.replace('/orders', undefined); // Remove query param from URL
+        setUrlPartnerFilterId(null); 
+        router.replace('/orders', { scroll: false }); 
         toast({
             title: "Partner Filter Cleared",
             description: "UI filters applied, partner-specific view cleared.",
@@ -146,9 +138,8 @@ export default function OrdersPage() {
     setDateUiFilter(undefined);
     if (urlPartnerFilterId) {
       setUrlPartnerFilterId(null);
-      router.replace('/orders', undefined); // Clear URL param
+      router.replace('/orders', { scroll: false }); 
     }
-    // setFilteredOrders(allOrders); // This will be handled by the useEffect
   }
 
   const handleViewOrder = (orderId: string) => {
@@ -166,7 +157,7 @@ export default function OrdersPage() {
   };
 
   const handleOrderCreated = () => {
-    fetchOrders(); // Refresh the main order list
+    fetchOrders(); 
     setIsCreateOrderDialogOpen(false);
   };
 
@@ -194,11 +185,11 @@ export default function OrdersPage() {
   };
 
   const handleMarkAsPickedUp = (orderId: string) => {
-    updateOrderStatus(orderId, 'picked', `Order ${orderId} marked as picked up.`);
+    updateOrderStatus(orderId, 'picked', `Order ${orderId.substring(0,8)}... marked as picked up.`);
   };
 
   const handleMarkAsDelivered = (orderId: string) => {
-    updateOrderStatus(orderId, 'delivered', `Order ${orderId} marked as delivered.`);
+    updateOrderStatus(orderId, 'delivered', `Order ${orderId.substring(0,8)}... marked as delivered.`);
   };
 
   const handleReportIssue = (orderId: string) => {
