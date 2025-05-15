@@ -19,16 +19,34 @@ export async function PUT(request: Request, context: { params: Params }) {
       return NextResponse.json({ message: 'Status is required' }, { status: 400 });
     }
 
-    const validStatuses: OrderStatus[] = ['pending', 'assigned', 'picked', 'delivered'];
+    const validStatuses: OrderStatus[] = ['pending', 'assigned', 'picked', 'delivered', 'cancelled'];
     if (!validStatuses.includes(newOrderStatus as OrderStatus)) {
       return NextResponse.json({ message: `Invalid status: ${newOrderStatus}. Valid statuses are: ${validStatuses.join(', ')}` }, { status: 400 });
     }
 
-    const orderUpdateData: { status: OrderStatus; assigned_to?: string | null } = { status: newOrderStatus as OrderStatus };
-    if (assignedPartnerId && newOrderStatus === 'assigned') {
+    // Fetch current order details if cancelling, to get assigned_partner_id for load decrement
+    let currentOrderAssignedTo: string | null = null;
+    if (newOrderStatus === 'cancelled') {
+      const { data: currentOrderData, error: fetchError } = await supabase
+        .from('orders')
+        .select('assigned_to')
+        .eq('id', orderId)
+        .single();
+      
+      if (fetchError && fetchError.code !== 'PGRST116') { // Ignore if order not found, proceed to update
+         return NextResponse.json({ message: `Failed to fetch current order details before cancellation: ${fetchError.message}` }, { status: 500 });
+      }
+      if (currentOrderData) {
+        currentOrderAssignedTo = currentOrderData.assigned_to;
+      }
+    }
+
+
+    const orderUpdateData: Record<string, any> = { status: newOrderStatus as OrderStatus };
+    if (newOrderStatus === 'assigned' && assignedPartnerId) {
       orderUpdateData.assigned_to = assignedPartnerId;
-    } else if (newOrderStatus === 'pending') {
-      orderUpdateData.assigned_to = null;
+    } else if (newOrderStatus === 'pending' || newOrderStatus === 'cancelled') {
+      orderUpdateData.assigned_to = null; // Clear partner assignment for pending or cancelled
     }
 
 
@@ -54,7 +72,7 @@ export async function PUT(request: Request, context: { params: Params }) {
     let assignmentLoggedSuccessfully = false;
     let assignmentLogError = "";
 
-
+    // Logic for 'assigned' status
     if (newOrderStatus === 'assigned' && assignedPartnerId) {
       const assignmentLogData = {
         order_id: orderId,
@@ -65,7 +83,7 @@ export async function PUT(request: Request, context: { params: Params }) {
       const { data: assignmentData, error: assignmentInsertError } = await supabase
         .from('assignments')
         .insert(assignmentLogData)
-        .select('*') // Select all columns to be more robust with RLS
+        .select('*')
         .single();
 
       if (assignmentInsertError) {
@@ -86,6 +104,7 @@ export async function PUT(request: Request, context: { params: Params }) {
         assignmentLoggedSuccessfully = true;
       }
 
+      // Increment partner load
       try {
         const { data: partnerData, error: partnerFetchError } = await supabase
           .from('delivery_partners')
@@ -113,7 +132,53 @@ export async function PUT(request: Request, context: { params: Params }) {
       } catch (e) {
           partnerLoadUpdateMessage = `Warning: Unexpected error during partner load update: ${(e as Error).message}`;
       }
+    } 
+    // Logic for 'cancelled' status
+    else if (newOrderStatus === 'cancelled' && currentOrderAssignedTo) {
+      // Decrement partner load
+      try {
+        const { data: partnerData, error: partnerFetchError } = await supabase
+          .from('delivery_partners')
+          .select('current_load')
+          .eq('id', currentOrderAssignedTo)
+          .single();
+
+        if (partnerFetchError) {
+          partnerLoadUpdateMessage = `Warning: Failed to fetch partner ${currentOrderAssignedTo} for load decrement: ${partnerFetchError.message}.`;
+        } else if (!partnerData) {
+          partnerLoadUpdateMessage = `Warning: Partner ${currentOrderAssignedTo} not found for load decrement.`;
+        } else {
+          const newLoad = Math.max(0, (partnerData.current_load || 0) - 1); // Ensure load doesn't go below 0
+          const { error: partnerUpdateError } = await supabase
+            .from('delivery_partners')
+            .update({ current_load: newLoad })
+            .eq('id', currentOrderAssignedTo);
+
+          if (partnerUpdateError) {
+            partnerLoadUpdateMessage = `Warning: Failed to decrement partner ${currentOrderAssignedTo} load: ${partnerUpdateError.message}`;
+          } else {
+            partnerLoadUpdateMessage = `Partner ${currentOrderAssignedTo.substring(0,8)}... load decremented.`;
+          }
+        }
+      } catch (e) {
+          partnerLoadUpdateMessage = `Warning: Unexpected error during partner load decrement for cancellation: ${(e as Error).message}`;
+      }
+      
+      // Update assignment record status to 'failed' with reason 'Order Cancelled'
+      const { error: updateAssignmentError } = await supabase
+        .from('assignments')
+        .update({ status: 'failed', reason: 'Order Cancelled' })
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: false }) // Target the latest assignment for this order
+        .limit(1); // Update only the latest one
+      
+      if (updateAssignmentError) {
+          partnerLoadUpdateMessage += ` Warning: Failed to update assignment record for cancelled order: ${updateAssignmentError.message}.`;
+      } else {
+          partnerLoadUpdateMessage += ` Assignment record updated for cancellation.`;
+      }
     }
+
 
     const finalUpdatedOrder: Order = {
       id: updatedOrderData.id,
@@ -136,7 +201,10 @@ export async function PUT(request: Request, context: { params: Params }) {
         if (partnerLoadUpdateMessage) {
             successMessage += ` ${partnerLoadUpdateMessage}`;
         }
+    } else if (newOrderStatus === 'cancelled' && partnerLoadUpdateMessage) {
+        successMessage += ` ${partnerLoadUpdateMessage}`;
     }
+
 
     return NextResponse.json({
       message: successMessage,

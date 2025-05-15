@@ -43,42 +43,30 @@ export default function OrdersPage() {
 
   useEffect(() => {
     const partnerIdFromUrl = searchParams.get('assignedPartnerId');
-    console.log(`[OrdersPage Effect] Partner ID from URL: ${partnerIdFromUrl}`);
     setUrlPartnerFilterId(partnerIdFromUrl);
   }, [searchParams]);
 
 
   const fetchOrders = useCallback(async () => {
-    console.log('[OrdersPage Fetch] Starting fetchOrders...');
     setIsLoading(true);
     try {
       const response = await fetch('/api/orders');
-      console.log(`[OrdersPage Fetch] API response status: ${response.status}`);
-      const responseText = await response.text(); // Get raw text first to avoid parsing errors with non-JSON
-      console.log('[OrdersPage Fetch] API raw response text:', responseText.substring(0, 500) + (responseText.length > 500 ? '...' : ''));
-
-
       if (!response.ok) {
         let errorMessage = `Failed to fetch orders (status: ${response.status})`;
         try {
-          // Attempt to parse error if API is supposed to return JSON error
-          if (responseText.startsWith('{') || responseText.startsWith('[')) { // Basic check for JSON
+          const responseText = await response.text();
+          if (responseText.startsWith('{') || responseText.startsWith('[')) {
              const errorData = JSON.parse(responseText);
              errorMessage = errorData.error || errorData.message || errorMessage;
-          } else if (responseText.startsWith("<!DOCTYPE html>")) { // Check for HTML error page
+          } else if (responseText.startsWith("<!DOCTYPE html>")) {
             errorMessage = `Failed to fetch orders. Server returned an HTML error page (status: ${response.status}). Check server logs.`;
           }
-          // If not JSON or HTML, use the raw text or a generic message
         } catch (jsonParseError) {
-           // This means response.ok was false, but the body wasn't valid JSON error
-           console.error('[OrdersPage Fetch] Failed to parse error JSON from API:', jsonParseError);
            errorMessage = `Failed to fetch orders. Server returned a non-JSON error response (status: ${response.status}). Check server logs.`;
         }
-        console.error('[OrdersPage Fetch] Throwing error:', errorMessage);
         throw new Error(errorMessage);
       }
-      const data: Order[] = JSON.parse(responseText); // Now parse the successful response
-      console.log(`[OrdersPage Fetch] Successfully parsed ${data ? data.length : '0'} orders.`);
+      const data: Order[] = await response.json();
       setAllOrders(data);
     } catch (error) {
       console.error("[OrdersPage Fetch] Error caught in fetchOrders:", error);
@@ -89,7 +77,6 @@ export default function OrdersPage() {
       });
       setAllOrders([]);
     } finally {
-      console.log('[OrdersPage Fetch] Finished fetchOrders, setIsLoading(false).');
       setIsLoading(false);
     }
   }, [toast]);
@@ -99,14 +86,13 @@ export default function OrdersPage() {
   }, [fetchOrders]);
 
   useEffect(() => {
-    console.log('[OrdersPage Effect] Filtering orders. All orders count:', allOrders.length, 'URL Partner Filter:', urlPartnerFilterId, 'UI Status:', statusUiFilter, 'UI Area:', areaUiFilter, 'UI Date:', dateUiFilter);
     let tempOrders = allOrders;
 
     if (urlPartnerFilterId) {
-      tempOrders = tempOrders.filter(order => order.assignedPartnerId === urlPartnerFilterId && (order.status === 'assigned' || order.status === 'picked'));
+      tempOrders = tempOrders.filter(order => order.assignedPartnerId === urlPartnerFilterId && (order.status === 'assigned' || order.status === 'picked' || order.status === 'delivered' || order.status === 'cancelled'));
        toast({
         title: "Partner Filter Active",
-        description: `Showing orders assigned to partner ID: ${urlPartnerFilterId.substring(0,8)}...`,
+        description: `Showing orders for partner ID: ${urlPartnerFilterId.substring(0,8)}...`,
         variant: "default", 
       });
     }
@@ -124,13 +110,11 @@ export default function OrdersPage() {
         new Date(order.creationDate).toDateString() === dateUiFilter.toDateString()
       );
     }
-    console.log(`[OrdersPage Effect] Filtered orders count: ${tempOrders.length}`);
     setFilteredOrders(tempOrders);
   }, [allOrders, urlPartnerFilterId, statusUiFilter, areaUiFilter, dateUiFilter, toast]);
 
 
   const handleFilterChange = (filters: { status?: OrderStatus | "all"; area?: string | "all"; date?: Date }) => {
-    console.log('[OrdersPage Action] handleFilterChange:', filters);
     if (urlPartnerFilterId) {
         setUrlPartnerFilterId(null); 
         router.replace('/orders', { scroll: false }); 
@@ -146,7 +130,6 @@ export default function OrdersPage() {
   };
 
   const handleClearFilters = () => {
-    console.log('[OrdersPage Action] handleClearFilters');
     setStatusUiFilter("all");
     setAreaUiFilter("all");
     setDateUiFilter(undefined);
@@ -217,6 +200,12 @@ export default function OrdersPage() {
     setOrderForReportingIssue(null);
   };
 
+  const handleCancelOrder = async (orderId: string) => {
+    if (window.confirm(`Are you sure you want to cancel order ${orderId.substring(0,8)}...? This action cannot be undone.`)) {
+      updateOrderStatus(orderId, 'cancelled', `Order ${orderId.substring(0,8)}... has been cancelled.`);
+    }
+  };
+
 
   return (
     <div className="space-y-6">
@@ -255,6 +244,7 @@ export default function OrdersPage() {
           onMarkAsPickedUp={handleMarkAsPickedUp}
           onMarkAsDelivered={handleMarkAsDelivered}
           onReportIssue={handleReportIssue}
+          onCancelOrder={handleCancelOrder}
         />
       )}
       <OrderDetailsDialog

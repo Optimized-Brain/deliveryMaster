@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { ArrowUpDown, MoreHorizontal, Eye, Truck, CheckCircle2, AlertCircle, XCircle } from "lucide-react"; // Added XCircle
+import { ArrowUpDown, MoreHorizontal, Eye, Truck, CheckCircle2, AlertCircle, XCircle, Ban } from "lucide-react";
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -17,7 +17,8 @@ interface OrderTableProps {
   onAssignOrder?: (orderId: string) => void;
   onMarkAsPickedUp?: (orderId: string) => void;
   onMarkAsDelivered?: (orderId: string) => void;
-  onReportIssue?: (orderId: string) => void; 
+  onReportIssue?: (orderId: string) => void;
+  onCancelOrder?: (orderId: string) => void;
 }
 
 type SortKey = keyof Order | '';
@@ -28,7 +29,8 @@ export function OrderTable({
   onAssignOrder,
   onMarkAsPickedUp,
   onMarkAsDelivered,
-  onReportIssue 
+  onReportIssue,
+  onCancelOrder
 }: OrderTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('creationDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -45,7 +47,11 @@ export function OrderTable({
       } else if (sortKey === 'orderValue') {
         valA = Number(valA);
         valB = Number(valB);
+      } else if (typeof valA === 'string' && typeof valB === 'string') {
+        valA = valA.toLowerCase();
+        valB = valB.toLowerCase();
       }
+
 
       if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
       if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
@@ -78,7 +84,7 @@ export function OrderTable({
       case 'delivered': return 'bg-emerald-500 hover:bg-emerald-600 text-white';
       case 'assigned': return 'bg-blue-500 hover:bg-blue-600 text-white';
       case 'picked': return 'bg-amber-500 hover:bg-amber-600 text-white';
-      case 'cancelled': return 'bg-red-500 hover:bg-red-600 text-white';
+      case 'cancelled': return 'bg-red-600 hover:bg-red-700 text-white'; // Adjusted for cancel
       default: return '';
     }
   }
@@ -108,7 +114,7 @@ export function OrderTable({
               Status {renderSortIcon('status')}
             </TableHead>
             <TableHead onClick={() => handleSort('orderValue')} className="cursor-pointer hover:bg-muted/50 text-right">
-              Value {renderSortIcon('orderValue')}
+              Value (₹) {renderSortIcon('orderValue')}
             </TableHead>
             <TableHead onClick={() => handleSort('creationDate')} className="cursor-pointer hover:bg-muted/50 text-right">
               Created {renderSortIcon('creationDate')}
@@ -168,6 +174,14 @@ export function OrderTable({
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => onReportIssue(order.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                           <AlertCircle className="mr-2 h-4 w-4" /> Report Issue
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    {(order.status === 'pending' || order.status === 'assigned' || order.status === 'picked') && onCancelOrder && (
+                       <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => onCancelOrder(order.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                          <Ban className="mr-2 h-4 w-4" /> Cancel Order
                         </DropdownMenuItem>
                       </>
                     )}
