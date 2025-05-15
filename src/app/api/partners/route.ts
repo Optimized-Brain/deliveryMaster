@@ -21,12 +21,12 @@ export async function GET(request: Request) {
     email: p.email,
     phone: p.phone,
     status: p.status as PartnerStatus,
-    assignedAreas: p.areas || [], // Changed from p.assigned_areas
+    assignedAreas: p.areas || [],
     shiftSchedule: p.shift_schedule,
     currentLoad: p.current_load,
     rating: p.rating,
     avatarUrl: p.avatar_url,
-    registrationDate: p.registration_date,
+    registrationDate: p.created_at, // Mapped from created_at
   }));
 
   return NextResponse.json(partners);
@@ -44,17 +44,18 @@ export async function POST(request: Request) {
     
     const assignedAreasArray = body.assignedAreas ? body.assignedAreas.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
 
+    // Supabase will automatically set created_at and updated_at
     const newPartnerData = {
       name: body.name,
       email: body.email,
       phone: body.phone,
       status: body.status || 'active',
-      areas: assignedAreasArray, // Changed from assigned_areas
+      areas: assignedAreasArray,
       shift_schedule: body.shiftSchedule,
       current_load: body.currentLoad || 0, // Default value
       rating: body.rating || 0, // Default value
       avatar_url: body.avatarUrl, // Optional
-      registration_date: new Date().toISOString(), // Set registration date
+      // created_at and updated_at are typically handled by Supabase
     };
 
     const { data, error } = await supabase
@@ -79,12 +80,12 @@ export async function POST(request: Request) {
       email: data.email,
       phone: data.phone,
       status: data.status as PartnerStatus,
-      assignedAreas: data.areas || [], // Changed from data.assigned_areas
+      assignedAreas: data.areas || [],
       shiftSchedule: data.shift_schedule,
       currentLoad: data.current_load,
       rating: data.rating,
       avatarUrl: data.avatar_url,
-      registrationDate: data.registration_date,
+      registrationDate: data.created_at, // Mapped from created_at
     };
 
     return NextResponse.json({ message: 'Partner created successfully', partner: createdPartner }, { status: 201 });

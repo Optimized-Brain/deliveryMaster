@@ -22,12 +22,13 @@ export async function PUT(request: Request, context: { params: Params }) {
     if (body.email !== undefined) updateData.email = body.email;
     if (body.phone !== undefined) updateData.phone = body.phone;
     if (body.status !== undefined) updateData.status = body.status;
-    if (assignedAreasArray !== undefined) updateData.areas = assignedAreasArray; // Changed from assigned_areas
+    if (assignedAreasArray !== undefined) updateData.areas = assignedAreasArray;
     if (body.shiftSchedule !== undefined) updateData.shift_schedule = body.shiftSchedule;
     if (body.currentLoad !== undefined) updateData.current_load = body.currentLoad;
     if (body.rating !== undefined) updateData.rating = body.rating;
     if (body.avatarUrl !== undefined) updateData.avatar_url = body.avatarUrl;
-    // registrationDate is typically not updated
+    // created_at should not be updated
+    // updated_at is typically handled by Supabase automatically
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ message: 'No fields to update' }, { status: 400 });
@@ -58,12 +59,12 @@ export async function PUT(request: Request, context: { params: Params }) {
       email: data.email,
       phone: data.phone,
       status: data.status as PartnerStatus,
-      assignedAreas: data.areas || [], // Changed from data.assigned_areas
+      assignedAreas: data.areas || [],
       shiftSchedule: data.shift_schedule,
       currentLoad: data.current_load,
       rating: data.rating,
       avatarUrl: data.avatar_url,
-      registrationDate: data.registration_date,
+      registrationDate: data.created_at, // Mapped from created_at
     };
 
     return NextResponse.json({ message: `Partner ${id} updated successfully`, partner: updatedPartner });
@@ -84,8 +85,6 @@ export async function DELETE(request: Request, context: { params: Params }) {
 
   if (error) {
     console.error(`Error deleting partner ${id}:`, error);
-    // Check if the error means the partner was not found, though Supabase delete doesn't typically error on not found, it just returns 0 rows affected.
-    // You might need to check the count if your Supabase client version provides it.
     return NextResponse.json({ message: `Error deleting partner ${id}`, error: error.message }, { status: 500 });
   }
 
