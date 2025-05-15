@@ -22,13 +22,33 @@ export default function PartnersPage() {
     try {
       const response = await fetch('/api/partners');
       if (!response.ok) {
-        throw new Error('Failed to fetch partners');
+        let errorDetails = `Failed to fetch partners (status: ${response.status})`;
+        try {
+          // Attempt to parse the error response from the API
+          const errorData = await response.json();
+          if (errorData.message && errorData.error) {
+            errorDetails = `${errorData.message} Details: ${errorData.error}`;
+          } else if (errorData.message) {
+            errorDetails = errorData.message;
+          } else if (errorData.error) {
+            errorDetails = errorData.error;
+          }
+        } catch (parseError) {
+          // If parsing fails, use the status text or the initial generic message
+          errorDetails = `Failed to fetch partners (status: ${response.status} ${response.statusText}). Could not parse error response.`;
+          console.error("Failed to parse error response from API:", parseError);
+        }
+        throw new Error(errorDetails);
       }
       const data: Partner[] = await response.json();
       setPartners(data);
     } catch (error) {
-      console.error("Error fetching partners:", error);
-      toast({ title: "Error", description: (error as Error).message || "Could not load partners.", variant: "destructive" });
+      console.error("Error fetching partners client-side:", error);
+      toast({ 
+        title: "Error Loading Partners", 
+        description: (error as Error).message, 
+        variant: "destructive" 
+      });
     } finally {
       setIsLoading(false);
     }
@@ -103,3 +123,4 @@ export default function PartnersPage() {
     </div>
   );
 }
+
