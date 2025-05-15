@@ -116,7 +116,9 @@ export function OrderTable({ orders, onViewOrder, onAssignOrder }: OrderTablePro
                 </Badge>
               </TableCell>
               <TableCell className="text-right">${order.orderValue.toFixed(2)}</TableCell>
-              <TableCell className="text-right">{format(new Date(order.creationDate), "PPp")}</TableCell>
+              <TableCell className="text-right" suppressHydrationWarning>
+                {order.creationDate ? format(new Date(order.creationDate), "PPp") : ''}
+              </TableCell>
               <TableCell className="text-right">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
