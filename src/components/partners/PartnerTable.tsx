@@ -33,6 +33,7 @@ function AssignedOrdersPopoverContent({
   deliveredOrders,
   cancelledOrders,
 }: AssignedOrdersPopoverContentProps) {
+  console.log(`[AssignedOrdersPopoverContent] Rendering for ${partnerName}. Active: ${activeOrders.length}, Delivered: ${deliveredOrders.length}, Cancelled: ${cancelledOrders.length}`);
 
   if (activeOrders.length === 0 && deliveredOrders.length === 0 && cancelledOrders.length === 0) {
     return <div className="p-4 text-muted-foreground text-sm">No orders found for {partnerName}.</div>;
@@ -130,7 +131,7 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
     console.log(`[PartnerTable] fetchOrdersForPartner: Fetching for partner ID ${partnerId} (${partnerName})`);
     setPartnerOrderData(prev => ({
       ...prev,
-      [partnerId]: { active: [], delivered: [], cancelled: [], isLoading: true, error: null }
+      [partnerId]: { ...(prev[partnerId] || { active: [], delivered: [], cancelled: [] }), isLoading: true, error: null }
     }));
     try {
       const response = await fetch(`/api/orders?assignedPartnerId=${partnerId}`);
@@ -161,27 +162,27 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
       console.error(`[PartnerTable] fetchOrdersForPartner: Error fetching orders for partner ${partnerId}:`, errorMessage);
       setPartnerOrderData(prev => ({
         ...prev,
-        [partnerId]: { active: [], delivered: [], cancelled: [], isLoading: false, error: errorMessage }
+        [partnerId]: { ...(prev[partnerId] || { active: [], delivered: [], cancelled: [] }), isLoading: false, error: errorMessage }
       }));
-       toast({ // Show toast for individual partner fetch failure
+       toast({ 
         title: `Order Fetch Failed for ${partnerName}`,
         description: errorMessage,
         variant: "destructive"
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toast]); 
+  }, [toast]); // Added toast to dependency array
 
   useEffect(() => {
-    console.log("[PartnerTable] useEffect: Partners prop changed or component mounted. Processing partners:", partners.length);
+    console.log("[PartnerTable] useEffect for partners changed. Processing partners:", partners.length);
     partners.forEach(partner => {
-      // Fetch if not present, or if previous fetch errored
+      // Fetch if not present, or if previous fetch errored, or if data for this partner is simply missing
       if (!partnerOrderData[partner.id] || partnerOrderData[partner.id]?.error) {
         console.log(`[PartnerTable] useEffect: Triggering fetch for partner ${partner.id}`);
         fetchOrdersForPartner(partner.id, partner.name);
       }
     });
-  }, [partners, fetchOrdersForPartner, partnerOrderData]); // Added partnerOrderData to ensure re-fetch if an error occurred
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [partners, fetchOrdersForPartner]); // partnerOrderData removed from here to avoid loop if fetchOrdersForPartner itself updates it and is a dep
 
   const filteredAndSortedPartners = useMemo(() => {
     let processedPartners = [...partners];
@@ -293,11 +294,11 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                 const ordersInfo = partnerOrderData[partner.id];
                 const isLoadingPartnerOrders = ordersInfo?.isLoading === true;
                 const partnerOrderError = ordersInfo?.error;
+                
+                // Derive counts from the live-fetched ordersInfo for direct cell display
                 const activeCount = ordersInfo?.active?.length || 0;
-                // Use partner.completedOrders and partner.cancelledOrders from the main partner object
-                // which are updated via API when order statuses change.
-                const completedCount = partner.completedOrders;
-                const cancelledCount = partner.cancelledOrders;
+                const deliveredCount = ordersInfo?.delivered?.length || 0;
+                const cancelledCount = ordersInfo?.cancelled?.length || 0;
 
 
                 return (
@@ -331,7 +332,7 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                         ) : (
                             <div className="space-y-0.5 text-center">
                                 <p>Active: <span className="font-semibold">{activeCount}</span></p>
-                                <p>Completed: <span className="font-semibold">{completedCount}</span></p>
+                                <p>Delivered: <span className="font-semibold">{deliveredCount}</span></p>
                                 <p>Cancelled: <span className="font-semibold">{cancelledCount}</span></p>
                                 <Popover>
                                 <PopoverTrigger asChild>
@@ -396,3 +397,4 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
     </div>
   );
 }
+
