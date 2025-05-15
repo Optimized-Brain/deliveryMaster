@@ -53,12 +53,39 @@ export function SmartAssignmentForm() {
         fetch('/api/partners?status=active') // Fetch only active partners
       ]);
 
-      if (!ordersResponse.ok) throw new Error('Failed to fetch pending orders');
+      if (!ordersResponse.ok) {
+        let errorDetails = `Failed to fetch pending orders (status: ${ordersResponse.status})`;
+        try {
+          const errorData = await ordersResponse.json();
+          if (errorData.error) { // Supabase specific error
+            errorDetails = `Failed to fetch pending orders: ${errorData.error}`;
+          } else if (errorData.message) {
+            errorDetails = errorData.message;
+          }
+        } catch (parseError) {
+          // Stick with the original simpler error if parsing fails
+          console.error("Failed to parse error response from fetching orders:", parseError);
+        }
+        throw new Error(errorDetails);
+      }
       const ordersData: Order[] = await ordersResponse.json();
       setPendingOrders(ordersData);
       setAllOrders(ordersData); // Keep a copy for finding selected order details
 
-      if (!partnersResponse.ok) throw new Error('Failed to fetch available partners');
+      if (!partnersResponse.ok) {
+        let errorDetails = `Failed to fetch available partners (status: ${partnersResponse.status})`;
+        try {
+          const errorData = await partnersResponse.json();
+          if (errorData.error) { // Supabase specific error
+            errorDetails = `Failed to fetch available partners: ${errorData.error}`;
+          } else if (errorData.message) {
+            errorDetails = errorData.message;
+          }
+        } catch (parseError) {
+          console.error("Failed to parse error response from fetching partners:", parseError);
+        }
+        throw new Error(errorDetails);
+      }
       const partnersData: Partner[] = await partnersResponse.json();
       setAvailablePartners(partnersData);
 
