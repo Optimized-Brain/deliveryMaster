@@ -2,7 +2,8 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import type { Order, OrderStatus } from '@/lib/types';
-import { SAMPLE_ORDERS } from '@/lib/constants'; // Using sample data for demo
+// SAMPLE_ORDERS is no longer used for GET requests
+// import { SAMPLE_ORDERS } from '@/lib/constants'; 
 import { z } from 'zod';
 
 // GET /api/orders
@@ -10,21 +11,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const statusFilter = searchParams.get('status') as OrderStatus | null;
 
-  // --- Demo mode: Use SAMPLE_ORDERS ---
-  let ordersToReturn = [...SAMPLE_ORDERS];
-
-  if (statusFilter) {
-    ordersToReturn = ordersToReturn.filter(order => order.status === statusFilter);
-  }
-  
-  // Sort by creationDate descending for consistency
-  ordersToReturn.sort((a, b) => new Date(b.creationDate).getTime() - new Date(a.creationDate).getTime());
-
-  return NextResponse.json(ordersToReturn);
-  // --- End Demo mode ---
-
-  /*
-  // --- Original Supabase logic (Uncomment to switch to live data) ---
+  // --- Switch to live Supabase data ---
   console.log("GET /api/orders - Using Supabase logic");
   let query = supabase.from('orders').select('id, customer_name, customer_phone, items, status, area, created_at, customer_address, assigned_to, total_amount');
 
@@ -41,7 +28,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: 'Error fetching orders', error: error.message }, { status: 500 });
   }
 
-  const orders: Order[] = data.map((o: any) => ({
+  const orders: Order[] = (data || []).map((o: any) => ({
     id: o.id,
     customerName: o.customer_name,
     customerPhone: o.customer_phone,
@@ -55,8 +42,7 @@ export async function GET(request: Request) {
   }));
 
   return NextResponse.json(orders);
-  // --- End Original Supabase logic ---
-  */
+  // --- End Supabase logic ---
 }
 
 const phoneRegex = new RegExp(
@@ -94,8 +80,8 @@ export async function POST(request: Request) {
       items: [{ name: validatedData.itemName, quantity: validatedData.itemQuantity }], // Simplified items structure
       status: 'pending' as OrderStatus, // Default status
       area: validatedData.area,
-      customer_address: validatedData.deliveryAddress,
-      total_amount: validatedData.orderValue,
+      customer_address: validatedData.deliveryAddress, // Mapped from deliveryAddress
+      total_amount: validatedData.orderValue, // Mapped from orderValue
       // Supabase will auto-generate 'id' (UUID) and 'created_at'
     };
 
@@ -129,10 +115,10 @@ export async function POST(request: Request) {
       items: data.items || [],
       status: data.status as OrderStatus,
       area: data.area,
-      creationDate: data.created_at,
-      deliveryAddress: data.customer_address,
-      assignedPartnerId: data.assigned_to,
-      orderValue: data.total_amount,
+      creationDate: data.created_at, // Mapped from created_at
+      deliveryAddress: data.customer_address, // Mapped from customer_address
+      assignedPartnerId: data.assigned_to, // Mapped from assigned_to
+      orderValue: data.total_amount, // Mapped from total_amount
     };
 
     return NextResponse.json({ message: 'Order created successfully', order: createdOrder }, { status: 201 });
