@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ArrowUpDown, MoreHorizontal, Edit2, Trash2, Phone, Mail } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, Edit2, Trash2, Phone, Mail, ListOrdered } from "lucide-react";
 import { cn } from '@/lib/utils';
 import { PARTNER_STATUSES } from '@/lib/constants';
+import Link from 'next/link';
 
 interface PartnerTableProps {
   partners: Partner[];
@@ -133,6 +134,7 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                 <TableHead onClick={() => handleSort('currentLoad')} className="cursor-pointer hover:bg-muted/50 text-center">
                   Load {renderSortIcon('currentLoad')}
                 </TableHead>
+                <TableHead>Assigned Orders</TableHead> {/* New Column */}
                 <TableHead onClick={() => handleSort('rating')} className="cursor-pointer hover:bg-muted/50 text-center">
                   Rating {renderSortIcon('rating')}
                 </TableHead>
@@ -160,6 +162,13 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                     {partner.assignedAreas.join(', ')}
                   </TableCell>
                   <TableCell className="text-center">{partner.currentLoad}</TableCell>
+                  <TableCell className="text-center"> {/* New Cell */}
+                    <Button variant="link" size="sm" asChild className="p-0 h-auto">
+                      <Link href={`/orders?assignedPartnerId=${partner.id}`}>
+                        View ({partner.currentLoad}) <ListOrdered className="ml-1 h-3.5 w-3.5" />
+                      </Link>
+                    </Button>
+                  </TableCell>
                   <TableCell className="text-center">{partner.rating.toFixed(1)}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>

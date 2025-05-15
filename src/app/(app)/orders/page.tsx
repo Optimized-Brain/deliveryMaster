@@ -6,10 +6,10 @@ import { OrderFilters } from "@/components/orders/OrderFilters";
 import { OrderTable } from "@/components/orders/OrderTable";
 import { OrderCreationForm } from "@/components/orders/OrderCreationForm";
 import { OrderDetailsDialog } from "@/components/orders/OrderDetailsDialog";
-import { ReportAssignmentIssueDialog } from "@/components/orders/ReportAssignmentIssueDialog"; // New import
+import { ReportAssignmentIssueDialog } from "@/components/orders/ReportAssignmentIssueDialog";
 import type { Order, OrderStatus } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,14 +24,32 @@ import {
 export default function OrdersPage() {
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateOrderDialogOpen, setIsCreateOrderDialogOpen] = useState(false);
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<Order | null>(null);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
-  const [isReportIssueDialogOpen, setIsReportIssueDialogOpen] = useState(false); // New state
-  const [orderForReportingIssue, setOrderForReportingIssue] = useState<string | null>(null); // New state
+  const [isReportIssueDialogOpen, setIsReportIssueDialogOpen] = useState(false);
+  const [orderForReportingIssue, setOrderForReportingIssue] = useState<string | null>(null);
+
+  // State for filters applied by OrderFilters component
+  const [statusUiFilter, setStatusUiFilter] = useState<OrderStatus | "all">("all");
+  const [areaUiFilter, setAreaUiFilter] = useState<string>("all");
+  const [dateUiFilter, setDateUiFilter] = useState<Date | undefined>(undefined);
+  
+  // State for filter applied by URL parameter
+  const [urlPartnerFilterId, setUrlPartnerFilterId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const partnerIdFromUrl = searchParams.get('assignedPartnerId');
+    setUrlPartnerFilterId(partnerIdFromUrl);
+    // If a partner filter is applied via URL, we might want to reset UI filters
+    // or indicate that a special filter is active. For now, just store it.
+  }, [searchParams]);
+
 
   const fetchOrders = useCallback(async () => {
     setIsLoading(true);
@@ -56,7 +74,7 @@ export default function OrdersPage() {
       }
       const data: Order[] = await response.json();
       setAllOrders(data);
-      setFilteredOrders(data);
+      // Initial filtering will be handled by the useEffect below
     } catch (error) {
       console.error("Error fetching orders:", error);
       toast({
@@ -75,27 +93,62 @@ export default function OrdersPage() {
     fetchOrders();
   }, [fetchOrders]);
 
-  const handleFilterChange = (filters: { status?: OrderStatus | "all"; area?: string | "all"; date?: Date }) => {
+  // Effect to apply all filters (URL param + UI filters)
+  useEffect(() => {
     let tempOrders = allOrders;
 
-    if (filters.status && filters.status !== "all") {
-      tempOrders = tempOrders.filter(order => order.status === filters.status);
+    if (urlPartnerFilterId) {
+      tempOrders = tempOrders.filter(order => order.assignedPartnerId === urlPartnerFilterId && (order.status === 'assigned' || order.status === 'picked'));
+       toast({
+        title: "Partner Filter Active",
+        description: `Showing orders assigned to partner ID: ${urlPartnerFilterId.substring(0,8)}...`,
+        variant: "default", 
+      });
     }
 
-    if (filters.area && filters.area !== "all") {
-      tempOrders = tempOrders.filter(order => order.area && filters.area && order.area.toLowerCase().includes(filters.area.toLowerCase()));
+    if (statusUiFilter && statusUiFilter !== "all") {
+      tempOrders = tempOrders.filter(order => order.status === statusUiFilter);
     }
 
-    if (filters.date) {
+    if (areaUiFilter && areaUiFilter !== "all") {
+      tempOrders = tempOrders.filter(order => order.area && areaUiFilter && order.area.toLowerCase().includes(areaUiFilter.toLowerCase()));
+    }
+
+    if (dateUiFilter) {
       tempOrders = tempOrders.filter(order =>
-        new Date(order.creationDate).toDateString() === filters.date!.toDateString()
+        new Date(order.creationDate).toDateString() === dateUiFilter.toDateString()
       );
     }
     setFilteredOrders(tempOrders);
+  }, [allOrders, urlPartnerFilterId, statusUiFilter, areaUiFilter, dateUiFilter, toast]);
+
+
+  const handleFilterChange = (filters: { status?: OrderStatus | "all"; area?: string | "all"; date?: Date }) => {
+    // When UI filters change, we clear any URL-based partner filter to avoid confusion,
+    // unless we want complex combined filtering. For simplicity, UI filters override URL partner filter for now.
+    if (urlPartnerFilterId) {
+        setUrlPartnerFilterId(null); // Clear URL partner filter if UI filters are used
+        router.replace('/orders', undefined); // Remove query param from URL
+        toast({
+            title: "Partner Filter Cleared",
+            description: "UI filters applied, partner-specific view cleared.",
+            variant: "default"
+        });
+    }
+    setStatusUiFilter(filters.status || "all");
+    setAreaUiFilter(filters.area || "all");
+    setDateUiFilter(filters.date);
   };
 
   const handleClearFilters = () => {
-    setFilteredOrders(allOrders);
+    setStatusUiFilter("all");
+    setAreaUiFilter("all");
+    setDateUiFilter(undefined);
+    if (urlPartnerFilterId) {
+      setUrlPartnerFilterId(null);
+      router.replace('/orders', undefined); // Clear URL param
+    }
+    // setFilteredOrders(allOrders); // This will be handled by the useEffect
   }
 
   const handleViewOrder = (orderId: string) => {
@@ -113,7 +166,7 @@ export default function OrdersPage() {
   };
 
   const handleOrderCreated = () => {
-    fetchOrders();
+    fetchOrders(); // Refresh the main order list
     setIsCreateOrderDialogOpen(false);
   };
 
@@ -196,7 +249,7 @@ export default function OrdersPage() {
           onAssignOrder={handleAssignOrder}
           onMarkAsPickedUp={handleMarkAsPickedUp}
           onMarkAsDelivered={handleMarkAsDelivered}
-          onReportIssue={handleReportIssue} // Pass handler
+          onReportIssue={handleReportIssue}
         />
       )}
       <OrderDetailsDialog
