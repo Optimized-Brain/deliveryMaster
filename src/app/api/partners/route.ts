@@ -2,13 +2,30 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import type { Partner, PartnerStatus } from '@/lib/types';
+import { PARTNER_STATUSES } from '@/lib/constants';
 
 // GET /api/partners
 export async function GET(request: Request) {
-  const { data, error } = await supabase
+  const { searchParams } = new URL(request.url);
+  const statusFilter = searchParams.get('status') as PartnerStatus | null;
+
+  let query = supabase
     .from('delivery_partners')
-    .select('*')
-    .order('name', { ascending: true });
+    .select('*');
+
+  if (statusFilter) {
+    if (PARTNER_STATUSES.includes(statusFilter)) {
+      query = query.eq('status', statusFilter);
+    } else {
+      // Optional: return an error for invalid status, or just ignore
+      console.warn(`Invalid status filter received: ${statusFilter}. Fetching all partners.`);
+      // Or: return NextResponse.json({ message: `Invalid status filter: ${statusFilter}` }, { status: 400 });
+    }
+  }
+  
+  query = query.order('name', { ascending: true });
+
+  const { data, error } = await query;
 
   if (error) {
     console.error('Error fetching partners:', error);
@@ -50,9 +67,9 @@ export async function POST(request: Request) {
       email: body.email,
       phone: body.phone,
       status: body.status || 'active',
-      areas: assignedAreasArray, // maps 'assignedAreas' from body to 'areas' for DB
-      shift_start: body.shiftStart, // maps 'shiftStart' from body
-      shift_end: body.shiftEnd,     // maps 'shiftEnd' from body
+      areas: assignedAreasArray, 
+      shift_start: body.shiftStart, 
+      shift_end: body.shiftEnd,     
       current_load: body.currentLoad || 0,
       rating: body.rating || 0,
       avatar_url: body.avatarUrl,
@@ -67,6 +84,7 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error('Error creating partner:', error);
+      // Return the Supabase error message for better client-side diagnostics
       return NextResponse.json({ message: 'Error creating partner', error: error.message }, { status: 500 });
     }
     
@@ -94,6 +112,7 @@ export async function POST(request: Request) {
   } catch (e) {
     console.error('Error processing POST /api/partners request:', e);
     const errorMessage = e instanceof Error ? e.message : String(e);
+    // Ensure the error from this catch block also gets to the client if it's not a Supabase error from the .insert()
     return NextResponse.json({ message: 'Invalid request body or unexpected server error', error: errorMessage }, { status: 400 });
   }
 }
