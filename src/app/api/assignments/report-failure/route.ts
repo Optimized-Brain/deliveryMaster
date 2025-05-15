@@ -20,18 +20,31 @@ export async function POST(request: Request) {
 
     // Step 1: Find the latest assignment for the orderId
     // Assuming 'created_at' is the timestamp column in your 'assignments' table
+    console.log(`POST /api/assignments/report-failure: Querying for latest assignment for orderId: ${orderId}`);
     const { data: latestAssignment, error: latestAssignmentError } = await supabase
       .from('assignments')
-      .select('id')
+      .select('*') // Select all columns to ensure RLS doesn't hide it based on selected columns
       .eq('order_id', orderId)
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
 
-    if (latestAssignmentError || !latestAssignment) {
-      const errorMessage = `Could not find an assignment record for order ID ${orderId} to update.`;
-      console.error(`POST /api/assignments/report-failure: ${errorMessage} Supabase error (if any):`, latestAssignmentError?.message);
-      return NextResponse.json({ message: errorMessage, error: latestAssignmentError?.message }, { status: 404 });
+    if (latestAssignmentError) {
+      const errorMessage = `Error fetching assignment record for order ID ${orderId}. Supabase error: ${latestAssignmentError.message}`;
+      console.error(`POST /api/assignments/report-failure: ${errorMessage}`, latestAssignmentError);
+      // If the error indicates "0 rows", it means the record wasn't found, which is not necessarily a query execution error.
+      if (latestAssignmentError.code === 'PGRST116') { // PGRST116: "Actual num rows 0 differs from expected 1"
+         const notFoundMessage = `Could not find an assignment record for order ID ${orderId} to update. (PGRST116)`;
+         console.warn(`POST /api/assignments/report-failure: ${notFoundMessage}`);
+         return NextResponse.json({ message: notFoundMessage }, { status: 404 });
+      }
+      return NextResponse.json({ message: 'Database error while fetching assignment record.', error: latestAssignmentError.message }, { status: 500 });
+    }
+    
+    if (!latestAssignment) {
+      const errorMessage = `Could not find an assignment record for order ID ${orderId} to update. (No data returned from query)`;
+      console.warn(`POST /api/assignments/report-failure: ${errorMessage}`);
+      return NextResponse.json({ message: errorMessage }, { status: 404 });
     }
 
     const assignmentIdToUpdate = latestAssignment.id;
@@ -71,7 +84,6 @@ export async function POST(request: Request) {
     
     if (!updatedOrder) {
          console.warn(`POST /api/assignments/report-failure: Order ${orderId} not found during status revert, though assignment was updated.`);
-         // This case might be unlikely if the previous check for assignment passed, but good to be cautious
          return NextResponse.json({ message: 'Assignment issue reported, but order not found for status revert.' }, { status: 404 });
     }
     console.log(`POST /api/assignments/report-failure: Successfully reverted order ${orderId} to 'pending' status and cleared assigned partner.`);
