@@ -8,9 +8,10 @@ import * as z from 'zod';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel as RHFormLabel, FormMessage } from "@/components/ui/form"; // Renamed FormLabel to avoid conflict
+import { Label } from "@/components/ui/label"; // Standard Label
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Wand2, Send, CheckCircle } from "lucide-react"; // Added Wand2, CheckCircle
+import { Loader2, Wand2, Send, CheckCircle } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { assignOrder, type AssignOrderInput, type AssignOrderOutput } from "@/ai/flows/smart-order-assignment";
 import { AssignmentResultCard } from './AssignmentResultCard';
@@ -85,12 +86,12 @@ export function SmartAssignmentForm() {
            if (errorText.startsWith("<!DOCTYPE html>")) {
             errorDetails = `Failed to fetch available partners. Server returned an HTML error page (status: ${partnersResponse.status}). Check server logs for the underlying error (e.g., environment variables).`;
           } else {
-            const errorData = JSON.parse(errorText);
+            const errorData = JSON.parse(errorText); // Attempt to parse as JSON
             errorDetails = errorData.message || errorData.error || errorDetails;
           }
         } catch (parseError) {
-          console.error("Failed to parse JSON error response from fetching partners. Server might have sent HTML.", parseError);
-          errorDetails = `Failed to fetch partners. Server returned a non-JSON response (status: ${partnersResponse.status}). Check server logs for the underlying error (e.g., environment variables).`;
+            console.error("Failed to parse JSON error response from fetching partners. Server might have sent HTML.", parseError);
+            errorDetails = `Failed to fetch partners. Server returned a non-JSON response (status: ${partnersResponse.status}). Check server logs for the underlying error (e.g., environment variables).`;
         }
         throw new Error(errorDetails);
       }
@@ -155,7 +156,7 @@ export function SmartAssignmentForm() {
     try {
       const result = await assignOrder(input);
       setAiSuggestion(result);
-      setSelectedPartnerForAssignment(result.suggestedPartnerId); // Pre-select AI suggestion
+      setSelectedPartnerForAssignment(result.suggestedPartnerId); 
       toast({
         title: "AI Suggestion Ready",
         description: `AI suggests partner ${result.suggestedPartnerId}. Review and confirm.`,
@@ -200,9 +201,14 @@ export function SmartAssignmentForm() {
             const errorData = await updateResponse.json();
             if (errorData && errorData.message) { 
                 errorDetails = errorData.message;
+            } else {
+                 const errorText = await updateResponse.text(); // Fallback to text if JSON parse fails or no message
+                 console.error("Raw error text from PUT /api/orders/[id]/status:", errorText);
+                 errorDetails = `Failed to update order status (API status: ${updateResponse.status}). ${errorText.substring(0,100)}`;
             }
         } catch (e) {
              console.error(`Could not parse JSON response from PUT /api/orders/${orderId}/status:`, e);
+             errorDetails = `Failed to update order status and parse error response (API status: ${updateResponse.status}). Check server logs.`;
         }
         throw new Error(errorDetails);
       }
@@ -213,10 +219,10 @@ export function SmartAssignmentForm() {
         variant: "default"
       });
       
-      fetchData(); // Refresh orders and partners list
-      setAiSuggestion(null); // Reset suggestion
-      setSelectedPartnerForAssignment(''); // Reset selected partner
-      form.resetField('orderId'); // Reset order selection or navigate away
+      fetchData(); 
+      setAiSuggestion(null); 
+      setSelectedPartnerForAssignment(''); 
+      form.resetField('orderId'); 
       form.resetField('orderLocation');
       // router.push('/orders'); // Optionally navigate away
 
@@ -256,7 +262,7 @@ export function SmartAssignmentForm() {
                 name="orderId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Order ID</FormLabel>
+                    <RHFormLabel>Order ID</RHFormLabel>
                     <Select 
                       onValueChange={(value) => {
                         field.onChange(value);
@@ -264,7 +270,7 @@ export function SmartAssignmentForm() {
                         if (currentSelectedOrder) {
                           form.setValue("orderLocation", currentSelectedOrder.area); 
                         }
-                        setAiSuggestion(null); // Clear previous suggestion when order changes
+                        setAiSuggestion(null); 
                         setSelectedPartnerForAssignment('');
                       }} 
                       value={field.value}
@@ -296,7 +302,7 @@ export function SmartAssignmentForm() {
                 name="orderLocation"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Order Location (auto-filled from order)</FormLabel>
+                    <RHFormLabel>Order Location (auto-filled from order)</RHFormLabel>
                     <FormControl>
                       <Input placeholder="e.g., Downtown" {...field} disabled />
                     </FormControl>
@@ -339,18 +345,17 @@ export function SmartAssignmentForm() {
               <CardDescription>Confirm the AI's suggestion or choose a different partner.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <FormItem>
-                <FormLabel>Assign to Partner</FormLabel>
+              <FormItem> {/* FormItem can stay for styling/layout */}
+                <Label htmlFor="partner-select">Assign to Partner</Label> {/* Changed FormLabel to Label */}
                 <Select
                   value={selectedPartnerForAssignment}
                   onValueChange={setSelectedPartnerForAssignment}
                   disabled={isConfirmingAssignment || availablePartners.length === 0}
                 >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a partner" />
-                    </SelectTrigger>
-                  </FormControl>
+                  {/* Removed FormControl wrapper */}
+                  <SelectTrigger id="partner-select">
+                    <SelectValue placeholder="Select a partner" />
+                  </SelectTrigger>
                   <SelectContent>
                     {availablePartners.map(partner => (
                       <SelectItem key={partner.id} value={partner.id}>
