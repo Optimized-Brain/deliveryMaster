@@ -5,7 +5,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { PartnerTable } from "@/components/partners/PartnerTable";
 import { PartnerRegistrationForm } from "@/components/partners/PartnerRegistrationForm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-// import { SAMPLE_PARTNERS } from "@/lib/constants"; // Will fetch from API
 import type { Partner } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { PlusCircle, Loader2 } from 'lucide-react';
@@ -16,6 +15,7 @@ export default function PartnersPage() {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>("list");
+  const [editingPartner, setEditingPartner] = useState<Partner | null>(null);
 
   const fetchPartners = useCallback(async () => {
     setIsLoading(true);
@@ -24,7 +24,6 @@ export default function PartnersPage() {
       if (!response.ok) {
         let errorDetails = `Failed to fetch partners (status: ${response.status})`;
         try {
-          // Attempt to parse the error response from the API
           const errorData = await response.json();
           if (errorData.message && errorData.error) {
             errorDetails = `${errorData.message} Details: ${errorData.error}`;
@@ -34,7 +33,6 @@ export default function PartnersPage() {
             errorDetails = errorData.error;
           }
         } catch (parseError) {
-          // If parsing fails, use the status text or the initial generic message
           errorDetails = `Failed to fetch partners (status: ${response.status} ${response.statusText}). Could not parse error response.`;
           console.error("Failed to parse error response from API:", parseError);
         }
@@ -59,48 +57,81 @@ export default function PartnersPage() {
   }, [fetchPartners]);
 
   const handleEditPartner = (partnerId: string) => {
-    toast({ title: "Edit Partner", description: `Editing partner ${partnerId}` });
-    // Logic to show edit form or navigate
-    // For a real app, you might fetch the partner data and populate an edit form.
+    const partnerToEdit = partners.find(p => p.id === partnerId);
+    if (partnerToEdit) {
+      setEditingPartner(partnerToEdit);
+      setActiveTab("register"); // Switch to the form tab, which will now be in edit mode
+      toast({ title: "Editing Partner", description: `Editing details for ${partnerToEdit.name}` });
+    } else {
+      toast({ title: "Error", description: "Could not find partner to edit.", variant: "destructive" });
+    }
   };
 
   const handleDeletePartner = async (partnerId: string) => {
-    if (window.confirm("Are you sure you want to delete this partner?")) {
+    const partnerToDelete = partners.find(p => p.id === partnerId);
+    if (!partnerToDelete) {
+      toast({ title: "Error", description: "Partner not found.", variant: "destructive" });
+      return;
+    }
+
+    if (window.confirm(`Are you sure you want to delete partner "${partnerToDelete.name}"? This action cannot be undone.`)) {
       try {
         const response = await fetch(`/api/partners/${partnerId}`, { method: 'DELETE' });
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to delete partner');
+          throw new Error(errorData.message || `Failed to delete partner ${partnerToDelete.name}`);
         }
         setPartners(prev => prev.filter(p => p.id !== partnerId));
-        toast({ title: "Partner Deleted", description: `Partner ${partnerId} has been deleted.`, variant: "default" });
+        toast({ title: "Partner Deleted", description: `Partner ${partnerToDelete.name} has been deleted.`, variant: "default" });
       } catch (error) {
         console.error("Error deleting partner:", error);
-        toast({ title: "Error", description: (error as Error).message, variant: "destructive" });
+        toast({ title: "Deletion Failed", description: (error as Error).message, variant: "destructive" });
       }
     }
   };
 
   const handlePartnerRegistered = () => {
     fetchPartners(); // Refetch partners list
+    setEditingPartner(null); // Ensure editing mode is off
     setActiveTab("list"); // Switch to list view
   };
+  
+  const handlePartnerUpdated = () => {
+    fetchPartners();
+    setEditingPartner(null);
+    setActiveTab("list");
+    toast({title: "Partner Updated", description: "Partner details have been successfully updated."})
+  }
+
+  const handleTabChange = (newTab: string) => {
+    if (newTab === "list") {
+      setEditingPartner(null); // Clear editing state when switching to list
+    }
+    setActiveTab(newTab);
+  }
+
+  const handleAddNewPartnerClick = () => {
+    setEditingPartner(null); // Ensure we are in "add" mode
+    setActiveTab("register");
+  }
+  
+  const formTabTitle = editingPartner ? "Edit Partner Details" : "Register New Partner";
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Delivery Partners</h1>
         {activeTab === "list" && (
-           <Button onClick={() => setActiveTab("register")}>
+           <Button onClick={handleAddNewPartnerClick}>
             <PlusCircle className="mr-2 h-4 w-4" /> Add New Partner
           </Button>
         )}
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-2 md:w-[400px]">
           <TabsTrigger value="list">Partner List</TabsTrigger>
-          <TabsTrigger value="register">Register New Partner</TabsTrigger>
+          <TabsTrigger value="register">{formTabTitle}</TabsTrigger>
         </TabsList>
         <TabsContent value="list" className="mt-6">
           {isLoading ? (
@@ -117,10 +148,14 @@ export default function PartnersPage() {
           )}
         </TabsContent>
         <TabsContent value="register" className="mt-6">
-          <PartnerRegistrationForm onPartnerRegistered={handlePartnerRegistered} />
+          <PartnerRegistrationForm 
+            partnerToEdit={editingPartner}
+            onPartnerRegistered={handlePartnerRegistered} 
+            onPartnerUpdated={handlePartnerUpdated}
+            key={editingPartner ? editingPartner.id : 'register-new'} // Force re-render on edit mode change
+          />
         </TabsContent>
       </Tabs>
     </div>
   );
 }
-

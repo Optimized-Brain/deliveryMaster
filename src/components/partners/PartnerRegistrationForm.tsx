@@ -1,19 +1,18 @@
 
 "use client";
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-// Removed Textarea import as it's no longer used for shift schedule
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PARTNER_STATUSES } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
-import type { PartnerStatus } from '@/lib/types';
+import type { Partner, PartnerStatus } from '@/lib/types';
 
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/; // HH:MM format
 
@@ -25,26 +24,31 @@ const partnerSchema = z.object({
   assignedAreas: z.string().min(1, "At least one area is required (comma-separated)"),
   shiftStart: z.string().regex(timeRegex, "Invalid start time format (HH:MM)"),
   shiftEnd: z.string().regex(timeRegex, "Invalid end time format (HH:MM)"),
-  // avatarUrl could be added here if desired
+  currentLoad: z.coerce.number().min(0, "Load cannot be negative").optional(),
+  rating: z.coerce.number().min(0, "Rating cannot be negative").max(5, "Rating cannot exceed 5").optional(),
+  avatarUrl: z.string().url("Invalid URL format for avatar").optional().or(z.literal('')),
 }).refine(data => {
-  // Optional: Add validation that shiftEnd is after shiftStart
   if (data.shiftStart && data.shiftEnd) {
     return data.shiftEnd > data.shiftStart;
   }
   return true;
 }, {
   message: "Shift end time must be after shift start time",
-  path: ["shiftEnd"], // Attach error to shiftEnd field
+  path: ["shiftEnd"],
 });
 
 type PartnerFormData = z.infer<typeof partnerSchema>;
 
 interface PartnerRegistrationFormProps {
+  partnerToEdit?: Partner | null;
   onPartnerRegistered?: () => void;
+  onPartnerUpdated?: () => void;
 }
 
-export function PartnerRegistrationForm({ onPartnerRegistered }: PartnerRegistrationFormProps) {
+export function PartnerRegistrationForm({ partnerToEdit, onPartnerRegistered, onPartnerUpdated }: PartnerRegistrationFormProps) {
   const { toast } = useToast();
+  const isEditMode = !!partnerToEdit;
+
   const form = useForm<PartnerFormData>({
     resolver: zodResolver(partnerSchema),
     defaultValues: {
@@ -55,34 +59,74 @@ export function PartnerRegistrationForm({ onPartnerRegistered }: PartnerRegistra
       assignedAreas: "",
       shiftStart: "09:00",
       shiftEnd: "17:00",
+      currentLoad: 0,
+      rating: 0,
+      avatarUrl: "",
     },
   });
 
+  useEffect(() => {
+    if (isEditMode && partnerToEdit) {
+      form.reset({
+        name: partnerToEdit.name,
+        email: partnerToEdit.email,
+        phone: partnerToEdit.phone,
+        status: partnerToEdit.status,
+        assignedAreas: partnerToEdit.assignedAreas.join(', '),
+        shiftStart: partnerToEdit.shiftStart,
+        shiftEnd: partnerToEdit.shiftEnd,
+        currentLoad: partnerToEdit.currentLoad,
+        rating: partnerToEdit.rating,
+        avatarUrl: partnerToEdit.avatarUrl || "",
+      });
+    } else {
+      form.reset({ // Reset to default values for registration mode
+        name: "",
+        email: "",
+        phone: "",
+        status: "active",
+        assignedAreas: "",
+        shiftStart: "09:00",
+        shiftEnd: "17:00",
+        currentLoad: 0,
+        rating: 0,
+        avatarUrl: "",
+      });
+    }
+  }, [isEditMode, partnerToEdit, form]);
+
   const onSubmit = async (data: PartnerFormData) => {
     try {
-      const response = await fetch('/api/partners', {
-        method: 'POST',
+      const url = isEditMode ? `/api/partners/${partnerToEdit!.id}` : '/api/partners';
+      const method = isEditMode ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method: method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || errorData.message || 'Failed to register partner');
+        throw new Error(errorData.error || errorData.message || `Failed to ${isEditMode ? 'update' : 'register'} partner`);
       }
 
       const result = await response.json();
       toast({
-        title: "Partner Registered",
-        description: `${result.partner.name} has been successfully registered.`,
+        title: `Partner ${isEditMode ? 'Updated' : 'Registered'}`,
+        description: `${result.partner.name} has been successfully ${isEditMode ? 'updated' : 'registered'}.`,
         variant: "default",
       });
-      form.reset();
-      onPartnerRegistered?.();
+      form.reset(); // Reset form after successful submission
+      if (isEditMode) {
+        onPartnerUpdated?.();
+      } else {
+        onPartnerRegistered?.();
+      }
     } catch (error) {
-      console.error("Partner registration failed:", error);
+      console.error(`Partner ${isEditMode ? 'update' : 'registration'} failed:`, error);
       toast({
-        title: "Registration Failed",
+        title: `${isEditMode ? 'Update' : 'Registration'} Failed`,
         description: (error as Error).message,
         variant: "destructive",
       });
@@ -92,8 +136,10 @@ export function PartnerRegistrationForm({ onPartnerRegistered }: PartnerRegistra
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-lg">
       <CardHeader>
-        <CardTitle>Register New Partner</CardTitle>
-        <CardDescription>Fill in the details to add a new delivery partner.</CardDescription>
+        <CardTitle>{isEditMode ? 'Edit Partner Details' : 'Register New Partner'}</CardTitle>
+        <CardDescription>
+          {isEditMode ? 'Update the details of the existing partner.' : 'Fill in the details to add a new delivery partner.'}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -145,7 +191,7 @@ export function PartnerRegistrationForm({ onPartnerRegistered }: PartnerRegistra
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Status</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select partner status" />
@@ -204,8 +250,51 @@ export function PartnerRegistrationForm({ onPartnerRegistered }: PartnerRegistra
                 )}
               />
             </div>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField
+                    control={form.control}
+                    name="currentLoad"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Current Load</FormLabel>
+                        <FormControl>
+                            <Input type="number" placeholder="e.g., 3" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                <FormField
+                    control={form.control}
+                    name="rating"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Rating (0-5)</FormLabel>
+                        <FormControl>
+                            <Input type="number" step="0.1" placeholder="e.g., 4.5" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+            </div>
+            <FormField
+                control={form.control}
+                name="avatarUrl"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Avatar URL (Optional)</FormLabel>
+                    <FormControl>
+                        <Input type="url" placeholder="https://example.com/avatar.png" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+            />
             <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? "Registering..." : "Register Partner"}
+              {form.formState.isSubmitting 
+                ? (isEditMode ? 'Updating...' : 'Registering...') 
+                : (isEditMode ? 'Update Partner' : 'Register Partner')}
             </Button>
           </form>
         </Form>
@@ -213,3 +302,4 @@ export function PartnerRegistrationForm({ onPartnerRegistered }: PartnerRegistra
     </Card>
   );
 }
+
