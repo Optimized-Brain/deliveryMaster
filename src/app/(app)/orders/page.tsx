@@ -53,16 +53,17 @@ export default function OrdersPage() {
     try {
       const response = await fetch('/api/orders');
       console.log("[OrdersPage Fetch] API response status:", response.status);
+
       if (!response.ok) {
         let errorMessage = `Failed to fetch orders (status: ${response.status})`;
         try {
           const responseText = await response.text();
           console.error("[OrdersPage Fetch] Raw error response from /api/orders:", responseText);
-          if (responseText.startsWith('{') || responseText.startsWith('[')) {
+          if (responseText.toLowerCase().includes("<!doctype html>")) {
+            errorMessage = `Failed to fetch orders. Server returned an HTML error page (status: ${response.status}). Check server logs.`;
+          } else if (responseText.startsWith('{') || responseText.startsWith('[')) {
              const errorData = JSON.parse(responseText);
              errorMessage = errorData.error || errorData.message || errorMessage;
-          } else if (responseText.toLowerCase().includes("<!doctype html>")) {
-            errorMessage = `Failed to fetch orders. Server returned an HTML error page (status: ${response.status}). Check server logs.`;
           } else {
              errorMessage = `Failed to fetch orders. Server returned a non-JSON error response (status: ${response.status}). Check server logs.`;
           }
@@ -82,7 +83,7 @@ export default function OrdersPage() {
         description: (error as Error).message,
         variant: "destructive",
       });
-      setAllOrders([]); // Ensure orders list is cleared on error
+      setAllOrders([]); 
     } finally {
       setIsLoading(false);
       console.log("[OrdersPage Fetch] fetchOrders finished.");
@@ -97,13 +98,14 @@ export default function OrdersPage() {
     let tempOrders = allOrders;
 
     if (urlPartnerFilterId) {
-      tempOrders = tempOrders.filter(order => order.assignedPartnerId === urlPartnerFilterId && (order.status === 'assigned' || order.status === 'picked' || order.status === 'delivered' || order.status === 'cancelled'));
+      tempOrders = tempOrders.filter(order => order.assignedPartnerId === urlPartnerFilterId);
        toast({
         title: "Partner Filter Active",
         description: `Showing orders for partner ID: ${urlPartnerFilterId.substring(0,8)}...`,
         variant: "default", 
       });
     }
+
 
     if (statusUiFilter && statusUiFilter !== "all") {
       tempOrders = tempOrders.filter(order => order.status === statusUiFilter);
@@ -166,7 +168,8 @@ export default function OrdersPage() {
     setIsCreateOrderDialogOpen(false);
   };
 
-  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus, successMessage: string) => {
+  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus, successMessageBase: string) => {
+    console.log(`[OrdersPage] updateOrderStatus: orderId=${orderId}, newStatus=${newStatus}`);
     try {
       const response = await fetch(`/api/orders/${orderId}/status`, {
         method: 'PUT',
@@ -174,13 +177,17 @@ export default function OrdersPage() {
         body: JSON.stringify({ status: newStatus }),
       });
 
+      const responseBody = await response.json();
+      console.log(`[OrdersPage] updateOrderStatus API response for ${orderId} to ${newStatus}: status=${response.status}, body=`, responseBody);
+
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Failed to update order status to ${newStatus}`);
+        throw new Error(responseBody.message || responseBody.error || `Failed to update order status to ${newStatus}`);
       }
-      toast({ title: "Order Updated", description: successMessage });
+      toast({ title: "Order Updated", description: responseBody.message || `${successMessageBase}` });
       fetchOrders(); 
     } catch (error) {
+      console.error(`[OrdersPage] updateOrderStatus failed for order ${orderId} to ${newStatus}:`, error);
       toast({
         title: "Update Failed",
         description: (error as Error).message,
@@ -209,8 +216,13 @@ export default function OrdersPage() {
   };
 
   const handleCancelOrder = async (orderId: string) => {
+    console.log(`[OrdersPage] handleCancelOrder: Initiated for orderId=${orderId}`);
     if (window.confirm(`Are you sure you want to cancel order ${orderId.substring(0,8)}...? This action cannot be undone.`)) {
+      console.log(`[OrdersPage] handleCancelOrder: User confirmed cancellation for orderId=${orderId}`);
       updateOrderStatus(orderId, 'cancelled', `Order ${orderId.substring(0,8)}... has been cancelled.`);
+    } else {
+      console.log(`[OrdersPage] handleCancelOrder: User cancelled the confirmation for orderId=${orderId}`);
+      toast({ title: "Action Cancelled", description: "Order cancellation was cancelled.", variant: "default"});
     }
   };
 

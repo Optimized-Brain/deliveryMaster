@@ -28,7 +28,7 @@ export default function PartnersPage() {
           if (errorText.toLowerCase().includes("<!doctype html>")) {
              errorDetails = `Failed to fetch partners. Server returned an HTML error page (status: ${response.status}). Check server logs.`;
           } else if (errorText) {
-            const errorData = JSON.parse(errorText); // Attempt to parse only if not HTML
+            const errorData = JSON.parse(errorText); 
             errorDetails = errorData.error || errorData.message || errorDetails;
           }
         } catch (parseError) {
@@ -72,23 +72,44 @@ export default function PartnersPage() {
       return;
     }
 
+    console.log(`[PartnersPage] handleDeletePartner ENTERED for ID: ${partnerId}, Name: ${partnerToDelete.name}`);
+
     if (window.confirm(`Are you sure you want to delete partner "${partnerToDelete.name}"? This action cannot be undone.`)) {
+      console.log(`[PartnersPage] User confirmed deletion for partner: ${partnerToDelete.name}. API call to /api/partners/${partnerId}`);
       try {
         const response = await fetch(`/api/partners/${partnerId}`, { method: 'DELETE' });
         
-        const result = await response.json(); 
+        console.log(`[PartnersPage] DELETE /api/partners/${partnerId} response status: ${response.status}, statusText: ${response.statusText}`);
+        
+        const resultText = await response.text(); // Get text first to avoid parsing errors on empty/non-JSON
+        let result;
+        try {
+          result = JSON.parse(resultText);
+          console.log(`[PartnersPage] DELETE /api/partners/${partnerId} response body:`, result);
+        } catch (e) {
+          console.error(`[PartnersPage] Failed to parse JSON response from DELETE /api/partners/${partnerId}. Raw text: ${resultText}`);
+          if (!response.ok) { // If response was not ok AND we couldn't parse JSON
+             throw new Error(`Deletion failed. Server responded with status ${response.status} and non-JSON content.`);
+          }
+          // If response was ok but content wasn't JSON (e.g. 204 No Content, though our API returns JSON)
+          // This path should ideally not be hit if API always returns JSON or specific error.
+          result = { message: `Partner deleted (status ${response.status}, no JSON body).` }; 
+        }
+
 
         if (!response.ok) {
-          // Prioritize result.error (specific Supabase error), then result.message, then generic
           const errorMessage = result.error || result.message || `Failed to delete partner. Status: ${response.status}`;
+          console.error(`[PartnersPage] Deletion failed for partner ${partnerToDelete.name}. Error: ${errorMessage}`);
           throw new Error(errorMessage);
         }
         
         // If response.ok, it means API returned 200 (deletion confirmed by API)
         setPartners(prevPartners => prevPartners.filter(p => p.id !== partnerId));
         toast({ title: "Partner Deleted", description: result.message || `Partner ${partnerToDelete.name} has been successfully deleted.`, variant: "default" });
+        console.log(`[PartnersPage] Successfully deleted partner ${partnerToDelete.name} from UI and showed toast.`);
 
       } catch (error) {
+        console.error(`[PartnersPage] Error during partner deletion process for ${partnerToDelete.name}:`, error);
         toast({ 
           title: "Deletion Failed", 
           description: (error as Error).message || "An unexpected error occurred during deletion.", 
@@ -96,6 +117,7 @@ export default function PartnersPage() {
         });
       }
     } else {
+      console.log(`[PartnersPage] Deletion of partner ${partnerToDelete.name} was cancelled by user.`);
       toast({ title: "Deletion Cancelled", description: `Deletion of partner ${partnerToDelete.name} was cancelled.`, variant: "default" });
     }
   };

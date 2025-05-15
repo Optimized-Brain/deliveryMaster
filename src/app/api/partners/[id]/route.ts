@@ -79,36 +79,52 @@ export async function PUT(request: Request, context: { params: Params }) {
 // DELETE /api/partners/[id]
 export async function DELETE(request: Request, context: { params: Params }) {
   const { id } = context.params;
+  console.log(`[API DELETE /api/partners/${id}] Received request to delete partner with ID: ${id}`);
 
   try {
+    console.log(`[API DELETE /api/partners/${id}] Attempting to delete from Supabase...`);
     const { error, count } = await supabase
       .from('delivery_partners')
       .delete({ count: 'exact' }) 
       .eq('id', id);
 
+    console.log(`[API DELETE /api/partners/${id}] Supabase delete result - Error: ${JSON.stringify(error)}, Count: ${count}`);
+
     if (error) {
-      // Log the detailed Supabase error on the server
+      console.error(`[API DELETE /api/partners/${id}] Supabase error occurred:`, error);
+      // Check for foreign key violation (code 23503)
+      if (error.code === '23503') {
+        return NextResponse.json({ 
+          message: `Failed to delete partner ${id.substring(0,8)}... because they are still referenced in other records (e.g., assigned orders). Please reassign or complete their orders first.`, 
+          error: "Foreign key constraint violation: " + error.message,
+          details: String(error.details ?? ''),
+          code: error.code 
+        }, { status: 409 }); // 409 Conflict is appropriate here
+      }
       return NextResponse.json({ 
         message: `Failed to delete partner with ID ${id}. Supabase error occurred.`, 
-        error: error.message, // Send Supabase message to client
+        error: error.message,
         details: String(error.details ?? ''),
         code: error.code 
       }, { status: 500 });
     }
 
     if (count === 0) {
+      console.log(`[API DELETE /api/partners/${id}] Partner not found (count is 0). Returning 404.`);
       return NextResponse.json({
-        message: `Partner with ID ${id} not found. No rows were deleted.`,
+        message: `Partner with ID ${id.substring(0,8)}... not found. No rows were deleted.`,
         error: "Partner not found"
       }, { status: 404 });
     }
     
     // Only if count > 0 and no error, we consider it a success
-    return NextResponse.json({ message: `Partner ${id} deleted successfully. ${count} row(s) affected.` }, { status: 200 });
+    console.log(`[API DELETE /api/partners/${id}] Partner deleted successfully (count: ${count}). Returning 200.`);
+    return NextResponse.json({ message: `Partner ${id.substring(0,8)}... deleted successfully. ${count} row(s) affected.` }, { status: 200 });
 
   } catch (e) {
     // Catch any other unexpected errors
     const errorMessage = e instanceof Error ? e.message : 'An unexpected server error occurred during deletion.';
+    console.error(`[API DELETE /api/partners/${id}] Unexpected server error:`, e);
     return NextResponse.json({ message: "Server error during partner deletion.", error: errorMessage }, { status: 500 });
   }
 }
