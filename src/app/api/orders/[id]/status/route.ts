@@ -13,21 +13,21 @@ export async function PUT(request: Request, context: { params: Params }) {
 
   try {
     const body = await request.json();
-    const { status, assignedPartnerId } = body;
+    const { status: newOrderStatus, assignedPartnerId } = body;
 
-    if (!status) {
+    if (!newOrderStatus) {
       return NextResponse.json({ message: 'Status is required' }, { status: 400 });
     }
 
     const validStatuses: OrderStatus[] = ['pending', 'assigned', 'picked', 'delivered'];
-    if (!validStatuses.includes(status as OrderStatus)) {
-      return NextResponse.json({ message: `Invalid status: ${status}. Valid statuses are: ${validStatuses.join(', ')}` }, { status: 400 });
+    if (!validStatuses.includes(newOrderStatus as OrderStatus)) {
+      return NextResponse.json({ message: `Invalid status: ${newOrderStatus}. Valid statuses are: ${validStatuses.join(', ')}` }, { status: 400 });
     }
 
-    const orderUpdateData: { status: OrderStatus; assigned_to?: string | null } = { status: status as OrderStatus };
-    if (assignedPartnerId && status === 'assigned') {
+    const orderUpdateData: { status: OrderStatus; assigned_to?: string | null } = { status: newOrderStatus as OrderStatus };
+    if (assignedPartnerId && newOrderStatus === 'assigned') {
       orderUpdateData.assigned_to = assignedPartnerId;
-    } else if (status === 'pending') { 
+    } else if (newOrderStatus === 'pending') { 
       orderUpdateData.assigned_to = null; 
     }
     
@@ -54,12 +54,14 @@ export async function PUT(request: Request, context: { params: Params }) {
     let assignmentLogError = "";
     let partnerLoadUpdateError = "";
 
-    if (status === 'assigned' && assignedPartnerId) {
-      // Attempt to log the assignment
+    if (newOrderStatus === 'assigned' && assignedPartnerId) {
+      // Create base assignment record
       const assignmentLogData = {
         order_id: orderId,
         partner_id: assignedPartnerId,
-        status: 'assigned', // Initial status for the assignment record
+        status: 'active', // Using 'active' as a placeholder for an initial assignment status.
+                           // Ensure 'active' is allowed by your 'assignments_status_check' constraint
+                           // and that the 'status' column in 'assignments' is NOT NULL.
       };
       
       const { data: assignmentData, error: assignmentInsertError } = await supabase
@@ -71,18 +73,20 @@ export async function PUT(request: Request, context: { params: Params }) {
       if (assignmentInsertError) {
         assignmentLoggedSuccessfully = false;
         assignmentLogError = `Failed to create assignment record: ${assignmentInsertError.message}. This is a critical issue. Supabase Code: ${assignmentInsertError.code}`;
-        // If logging the assignment is critical, return an error
+        // This is a critical failure, so return a 500 error.
         return NextResponse.json({ 
-          message: `Order status updated to '${status}', but FAILED to log assignment record. Please check server logs for details. Supabase: ${assignmentLogError}`, 
+          message: `Order status updated to '${newOrderStatus}', but FAILED to log assignment record. Please check server logs for details. Supabase: ${assignmentLogError}`, 
           error: assignmentLogError 
         }, { status: 500 });
       }
       
       if (!assignmentData && assignmentLoggedSuccessfully) { 
+          // This case should ideally not happen if insert was successful and no error was thrown,
+          // but as a safeguard:
           assignmentLoggedSuccessfully = false; 
-          assignmentLogError = 'Failed to confirm assignment record creation (no data returned after insert). This is a critical issue.';
+          assignmentLogError = 'Failed to confirm assignment record creation (no data returned after insert despite no error). This is a critical issue.';
           return NextResponse.json({
-              message: `Order status updated to '${status}', but FAILED to confirm assignment record creation. Please check server logs.`,
+              message: `Order status updated to '${newOrderStatus}', but FAILED to confirm assignment record creation. Please check server logs.`,
               error: assignmentLogError
           }, { status: 500 });
       }
@@ -132,10 +136,10 @@ export async function PUT(request: Request, context: { params: Params }) {
       orderValue: updatedOrderData.total_amount, 
     };
     
-    let successMessage = `Status for order ${orderId.substring(0,8)}... updated successfully to ${status}.`;
-    if (status === 'assigned' && assignedPartnerId) {
-        if (assignmentLoggedSuccessfully) {
-            successMessage += ` Assignment logged.`;
+    let successMessage = `Status for order ${orderId.substring(0,8)}... updated successfully to ${newOrderStatus}.`;
+    if (newOrderStatus === 'assigned' && assignedPartnerId) {
+        if (assignmentLoggedSuccessfully) { // This will be true if we haven't errored out before this point
+            successMessage += ` Assignment logged successfully.`;
         }
         if (!partnerLoadUpdatedSuccessfully) {
             successMessage += ` WARNING: Partner load update failed: ${partnerLoadUpdateError}. Please check server logs.`;
