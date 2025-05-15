@@ -25,11 +25,12 @@ export default function OrdersPage() {
         try {
           const errorText = await response.text();
           console.error("Raw error response from /api/orders:", errorText);
-          const errorData = JSON.parse(errorText);
+          const errorData = JSON.parse(errorText); // Attempt to parse as JSON
           errorMessage = errorData.error || errorData.message || errorMessage;
         } catch (jsonParseError) {
-          errorMessage = response.statusText || errorMessage;
-          console.error("Failed to parse error response from fetching orders:", jsonParseError);
+          // Failed to parse, means server likely sent HTML or non-JSON
+          console.error("Failed to parse JSON error response from fetching orders. Server might have sent HTML.", jsonParseError);
+          errorMessage = `Failed to fetch orders. Server returned a non-JSON response (status: ${response.status}). Check server logs.`;
         }
         throw new Error(errorMessage);
       }
@@ -79,6 +80,7 @@ export default function OrdersPage() {
 
   const handleViewOrder = (orderId: string) => {
     toast({ title: "View Order", description: `Viewing details for order ${orderId}` });
+    // Future: router.push(`/orders/${orderId}`);
   };
 
   const handleAssignOrder = (orderId: string) => {

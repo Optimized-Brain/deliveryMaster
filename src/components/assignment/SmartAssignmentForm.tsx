@@ -14,7 +14,7 @@ import { Loader2, Send } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { assignOrder, type AssignOrderInput, type AssignOrderOutput } from "@/ai/flows/smart-order-assignment";
 import { AssignmentResultCard } from './AssignmentResultCard';
-import type { Order, Partner } from '@/lib/types';
+import type { Order, Partner } from "@/lib/types";
 import { useSearchParams, useRouter } from 'next/navigation';
 
 const assignmentSchema = z.object({
@@ -47,6 +47,8 @@ export function SmartAssignmentForm() {
 
   const fetchData = useCallback(async () => {
     setIsDataLoading(true);
+    setPendingOrders([]);
+    setAvailablePartners([]);
     try {
       const [ordersResponse, partnersResponse] = await Promise.all([
         fetch('/api/orders?status=pending'), 
@@ -58,34 +60,36 @@ export function SmartAssignmentForm() {
         try {
           const errorText = await ordersResponse.text();
           console.error("Raw error response from /api/orders?status=pending:", errorText);
-          const errorData = JSON.parse(errorText);
+          const errorData = JSON.parse(errorText); // Attempt to parse as JSON
           if (errorData.error) { 
             errorDetails = `Failed to fetch pending orders: ${errorData.error}`;
           } else if (errorData.message) {
             errorDetails = errorData.message;
           }
         } catch (parseError) {
-          console.error("Failed to parse error response from fetching orders:", parseError);
+          console.error("Failed to parse JSON error response from fetching orders. Server might have sent HTML.", parseError);
+          errorDetails = `Failed to fetch orders. Server returned a non-JSON response (status: ${ordersResponse.status}). Check server logs.`;
         }
         throw new Error(errorDetails);
       }
       const ordersData: Order[] = await ordersResponse.json();
       setPendingOrders(ordersData);
-      setAllOrders(ordersData);
+      setAllOrders(ordersData); // Keep a copy for finding selected order details
 
       if (!partnersResponse.ok) {
         let errorDetails = `Failed to fetch available partners (status: ${partnersResponse.status})`;
         try {
           const errorText = await partnersResponse.text();
           console.error("Raw error response from /api/partners?status=active:", errorText);
-          const errorData = JSON.parse(errorText);
+          const errorData = JSON.parse(errorText); // Attempt to parse as JSON
           if (errorData.error) { 
             errorDetails = `Failed to fetch available partners: ${errorData.error}`;
           } else if (errorData.message) {
             errorDetails = errorData.message;
           }
         } catch (parseError) {
-          console.error("Failed to parse error response from fetching partners:", parseError);
+          console.error("Failed to parse JSON error response from fetching partners. Server might have sent HTML.", parseError);
+          errorDetails = `Failed to fetch partners. Server returned a non-JSON response (status: ${partnersResponse.status}). Check server logs.`;
         }
         throw new Error(errorDetails);
       }
@@ -93,10 +97,11 @@ export function SmartAssignmentForm() {
       setAvailablePartners(partnersData);
 
       const queryOrderId = searchParams.get('orderId');
-      if (queryOrderId && ordersData.some(o => o.id === queryOrderId)) {
-        form.setValue('orderId', queryOrderId);
-        const selectedOrder = ordersData.find(o => o.id === queryOrderId);
+      if (queryOrderId) {
+        const allFetchedOrders = [...ordersData, ...allOrders.filter(o => !ordersData.find(po => po.id === o.id))]; // Combine pending with potentially already fetched non-pending
+        const selectedOrder = allFetchedOrders.find(o => o.id === queryOrderId);
         if (selectedOrder) {
+          form.setValue('orderId', queryOrderId);
           form.setValue('orderLocation', selectedOrder.area);
         }
       }
@@ -111,7 +116,7 @@ export function SmartAssignmentForm() {
     } finally {
       setIsDataLoading(false);
     }
-  }, [toast, searchParams, form]);
+  }, [toast, searchParams, form, allOrders]); // Added allOrders to dependency array
 
   useEffect(() => {
     fetchData();
@@ -161,8 +166,14 @@ export function SmartAssignmentForm() {
       });
 
       if (!updateResponse.ok) {
-        const errorData = await updateResponse.json();
-        throw new Error(errorData.message || `Failed to update order ${data.orderId} status.`);
+        let errorDetails = `Failed to update order ${data.orderId} status (status: ${updateResponse.status})`;
+        try {
+            const errorData = await updateResponse.json();
+            errorDetails = errorData.message || errorDetails;
+        } catch (e) {
+            //  Failed to parse JSON, use the generic message
+        }
+        throw new Error(errorDetails);
       }
       
       toast({
@@ -170,7 +181,7 @@ export function SmartAssignmentForm() {
         description: `Order ${data.orderId} assigned to partner ${result.assignedPartnerId} and status updated.`,
       });
       
-      fetchData(); 
+      fetchData(); // Refetch data to update lists (e.g., pending orders)
 
     } catch (error) {
       console.error("Smart assignment or order update failed:", error);
