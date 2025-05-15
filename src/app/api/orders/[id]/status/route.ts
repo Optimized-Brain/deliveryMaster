@@ -53,8 +53,6 @@ export async function PUT(request: Request, context: { params: Params }) {
       return NextResponse.json({ message: `Order update failed: ${error.message || 'Unknown Supabase error'}` }, { status: 500 });
     }
     
-    // This check is often redundant if .single() is used and PGRST116 is handled,
-    // but kept as a fallback.
     if (!data) {
         console.warn(`PUT /api/orders/${id}/status: Order not found after update attempt (no data returned).`);
         return NextResponse.json({ message: `Order with ID ${id} not found after update attempt.` }, { status: 404 });
@@ -68,8 +66,8 @@ export async function PUT(request: Request, context: { params: Params }) {
         status: data.status as OrderStatus,
         area: data.area,
         creationDate: data.created_at, // Mapped from created_at
-        deliveryAddress: data.delivery_address,
-        assignedPartnerId: data.assigned_to, // Mapped from assigned_to
+        deliveryAddress: data.customer_address, // Mapped from customer_address
+        assignedPartnerId: data.assigned_to, 
         orderValue: data.order_value,
     };
 

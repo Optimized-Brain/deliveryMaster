@@ -48,7 +48,7 @@ export async function GET(request: Request) {
     status: o.status as OrderStatus,
     area: o.area,
     creationDate: o.created_at, 
-    deliveryAddress: o.delivery_address,
+    deliveryAddress: o.customer_address, // Mapped from customer_address
     assignedPartnerId: o.assigned_to, 
     orderValue: o.order_value,
   }));
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
       items: [{ name: validatedData.itemName, quantity: validatedData.itemQuantity }], // Simplified items structure
       status: 'pending' as OrderStatus, // Default status
       area: validatedData.area,
-      delivery_address: validatedData.deliveryAddress,
+      customer_address: validatedData.deliveryAddress, // Mapped to customer_address
       order_value: validatedData.orderValue,
       // Supabase will auto-generate 'id' (UUID) and 'created_at'
     };
@@ -122,7 +122,7 @@ export async function POST(request: Request) {
       status: data.status as OrderStatus,
       area: data.area,
       creationDate: data.created_at,
-      deliveryAddress: data.delivery_address,
+      deliveryAddress: data.customer_address, // Mapped from customer_address
       assignedPartnerId: data.assigned_to,
       orderValue: data.order_value,
     };
