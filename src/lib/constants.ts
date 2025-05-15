@@ -1,3 +1,4 @@
+
 import type { NavItem, Partner, Order, Metric, PartnerStatus, OrderStatus } from '@/lib/types';
 import { LayoutDashboard, ListOrdered, Users, Shuffle, Activity, Star, MapPin } from 'lucide-react';
 
@@ -85,7 +86,7 @@ export const SAMPLE_ORDERS: Order[] = [
     items: [{ name: 'Pizza', quantity: 1 }, { name: 'Soda', quantity: 2 }],
     status: 'pending' as OrderStatus,
     area: 'Downtown',
-    creationDate: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(), // 1 hour ago
+    creationDate: '2024-05-15T10:30:00Z', // Static ISO string
     deliveryAddress: '123 Main St, Downtown',
     orderValue: 25.99,
   },
@@ -95,7 +96,7 @@ export const SAMPLE_ORDERS: Order[] = [
     items: [{ name: 'Groceries', quantity: 10 }],
     status: 'assigned' as OrderStatus,
     area: 'North End',
-    creationDate: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
+    creationDate: '2024-05-15T09:30:00Z', // Static ISO string
     deliveryAddress: '456 Oak Ave, North End',
     assignedPartnerId: 'partner-001',
     orderValue: 75.50,
@@ -106,7 +107,7 @@ export const SAMPLE_ORDERS: Order[] = [
     items: [{ name: 'Electronics', quantity: 1 }],
     status: 'in-transit' as OrderStatus,
     area: 'Westside',
-    creationDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days ago
+    creationDate: '2024-05-12T14:00:00Z', // Static ISO string
     deliveryAddress: '789 Pine Ln, Westside',
     assignedPartnerId: 'partner-002',
     orderValue: 199.99,
@@ -117,7 +118,7 @@ export const SAMPLE_ORDERS: Order[] = [
     items: [{ name: 'Books', quantity: 3 }],
     status: 'delivered' as OrderStatus,
     area: 'Eastside',
-    creationDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days ago
+    creationDate: '2024-05-10T18:45:00Z', // Static ISO string
     deliveryAddress: '321 Elm Rd, Eastside',
     assignedPartnerId: 'partner-003',
     orderValue: 45.00,
@@ -128,7 +129,7 @@ export const SAMPLE_ORDERS: Order[] = [
     items: [{ name: 'Flowers', quantity: 1 }],
     status: 'pending' as OrderStatus,
     area: 'Suburbia',
-    creationDate: new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 minutes ago
+    creationDate: '2024-05-15T11:00:00Z', // Static ISO string
     deliveryAddress: '567 Willow Dr, Suburbia',
     orderValue: 35.00,
   },
@@ -138,7 +139,7 @@ export const SAMPLE_ORDERS: Order[] = [
     items: [{ name: 'Takeout Food', quantity: 4 }],
     status: 'cancelled' as OrderStatus,
     area: 'Downtown',
-    creationDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
+    creationDate: '2024-05-14T12:15:00Z', // Static ISO string
     deliveryAddress: '890 Maple Ct, Downtown',
     orderValue: 60.25,
   },
