@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { ArrowUpDown, MoreHorizontal, Eye, Truck, CheckCircle2 } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, Eye, Truck, CheckCircle2, AlertCircle } from "lucide-react";
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -17,6 +17,7 @@ interface OrderTableProps {
   onAssignOrder?: (orderId: string) => void;
   onMarkAsPickedUp?: (orderId: string) => void;
   onMarkAsDelivered?: (orderId: string) => void;
+  onReportIssue?: (orderId: string) => void; // New prop
 }
 
 type SortKey = keyof Order | '';
@@ -26,7 +27,8 @@ export function OrderTable({
   onViewOrder, 
   onAssignOrder,
   onMarkAsPickedUp,
-  onMarkAsDelivered 
+  onMarkAsDelivered,
+  onReportIssue // New prop
 }: OrderTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('creationDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -64,9 +66,8 @@ export function OrderTable({
     switch (status) {
       case 'pending': return 'secondary';
       case 'assigned': return 'default';
-      case 'picked': return 'outline'; // Changed from 'in-transit'
+      case 'picked': return 'outline';
       case 'delivered': return 'default'; 
-      // 'cancelled' case removed as it's not in the allowed DB statuses
       default: return 'secondary';
     }
   };
@@ -75,7 +76,7 @@ export function OrderTable({
      switch (status) {
       case 'delivered': return 'bg-emerald-500 hover:bg-emerald-600 text-white';
       case 'assigned': return 'bg-blue-500 hover:bg-blue-600 text-white';
-      case 'picked': return 'bg-amber-500 hover:bg-amber-600 text-white'; // Changed from 'in-transit'
+      case 'picked': return 'bg-amber-500 hover:bg-amber-600 text-white';
       default: return '';
     }
   }
@@ -142,8 +143,8 @@ export function OrderTable({
                         <Eye className="mr-2 h-4 w-4" /> View Details
                       </DropdownMenuItem>
                     )}
-                    {/* Conditional rendering based on new status flow */}
-                    {(order.status === 'pending' || order.status === 'assigned') && <DropdownMenuSeparator />}
+                    
+                    {(order.status === 'pending' || order.status === 'assigned' || order.status === 'picked') && <DropdownMenuSeparator />}
                     
                     {order.status === 'pending' && onAssignOrder && (
                       <DropdownMenuItem onClick={() => onAssignOrder(order.id)}>
@@ -155,10 +156,18 @@ export function OrderTable({
                         <Truck className="mr-2 h-4 w-4" /> Mark as Picked Up
                       </DropdownMenuItem>
                     )}
-                    {order.status === 'picked' && onMarkAsDelivered && ( // Changed from 'in-transit'
+                    {order.status === 'picked' && onMarkAsDelivered && (
                        <DropdownMenuItem onClick={() => onMarkAsDelivered(order.id)}>
                         <CheckCircle2 className="mr-2 h-4 w-4" /> Mark as Delivered
                       </DropdownMenuItem>
+                    )}
+                     {(order.status === 'assigned' || order.status === 'picked') && onReportIssue && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => onReportIssue(order.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                          <AlertCircle className="mr-2 h-4 w-4" /> Report Issue
+                        </DropdownMenuItem>
+                      </>
                     )}
                   </DropdownMenuContent>
                 </DropdownMenu>

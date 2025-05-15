@@ -6,6 +6,7 @@ import { OrderFilters } from "@/components/orders/OrderFilters";
 import { OrderTable } from "@/components/orders/OrderTable";
 import { OrderCreationForm } from "@/components/orders/OrderCreationForm";
 import { OrderDetailsDialog } from "@/components/orders/OrderDetailsDialog";
+import { ReportAssignmentIssueDialog } from "@/components/orders/ReportAssignmentIssueDialog"; // New import
 import type { Order, OrderStatus } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from 'next/navigation';
@@ -29,6 +30,8 @@ export default function OrdersPage() {
   const [isCreateOrderDialogOpen, setIsCreateOrderDialogOpen] = useState(false);
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<Order | null>(null);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [isReportIssueDialogOpen, setIsReportIssueDialogOpen] = useState(false); // New state
+  const [orderForReportingIssue, setOrderForReportingIssue] = useState<string | null>(null); // New state
 
   const fetchOrders = useCallback(async () => {
     setIsLoading(true);
@@ -127,7 +130,7 @@ export default function OrdersPage() {
         throw new Error(errorData.message || `Failed to update order status to ${newStatus}`);
       }
       toast({ title: "Order Updated", description: successMessage });
-      fetchOrders(); // Refresh orders list
+      fetchOrders(); 
     } catch (error) {
       toast({
         title: "Update Failed",
@@ -138,12 +141,22 @@ export default function OrdersPage() {
   };
 
   const handleMarkAsPickedUp = (orderId: string) => {
-    // Changed status to 'picked'
     updateOrderStatus(orderId, 'picked', `Order ${orderId} marked as picked up.`);
   };
 
   const handleMarkAsDelivered = (orderId: string) => {
     updateOrderStatus(orderId, 'delivered', `Order ${orderId} marked as delivered.`);
+  };
+
+  const handleReportIssue = (orderId: string) => {
+    setOrderForReportingIssue(orderId);
+    setIsReportIssueDialogOpen(true);
+  };
+
+  const handleIssueReported = () => {
+    fetchOrders();
+    setIsReportIssueDialogOpen(false);
+    setOrderForReportingIssue(null);
   };
 
 
@@ -183,6 +196,7 @@ export default function OrdersPage() {
           onAssignOrder={handleAssignOrder}
           onMarkAsPickedUp={handleMarkAsPickedUp}
           onMarkAsDelivered={handleMarkAsDelivered}
+          onReportIssue={handleReportIssue} // Pass handler
         />
       )}
       <OrderDetailsDialog
@@ -190,6 +204,14 @@ export default function OrdersPage() {
         isOpen={isDetailsDialogOpen}
         onOpenChange={setIsDetailsDialogOpen}
       />
+      {orderForReportingIssue && (
+        <ReportAssignmentIssueDialog
+          orderId={orderForReportingIssue}
+          isOpen={isReportIssueDialogOpen}
+          onOpenChange={setIsReportIssueDialogOpen}
+          onIssueReported={handleIssueReported}
+        />
+      )}
     </div>
   );
 }
