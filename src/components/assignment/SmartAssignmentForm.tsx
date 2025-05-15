@@ -34,8 +34,6 @@ export function SmartAssignmentForm() {
   
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
   const [availablePartners, setAvailablePartners] = useState<Partner[]>([]);
-  const [allOrders, setAllOrders] = useState<Order[]>([]);
-
 
   const form = useForm<AssignmentFormData>({
     resolver: zodResolver(assignmentSchema),
@@ -60,11 +58,15 @@ export function SmartAssignmentForm() {
         try {
           const errorText = await ordersResponse.text();
           console.error("Raw error response from /api/orders?status=pending:", errorText);
-          const errorData = JSON.parse(errorText); // Attempt to parse as JSON
-          if (errorData.error) { 
-            errorDetails = `Failed to fetch pending orders: ${errorData.error}`;
-          } else if (errorData.message) {
-            errorDetails = errorData.message;
+          if (errorText.startsWith("<!DOCTYPE html>")) {
+            errorDetails = `Failed to fetch pending orders. Server returned an HTML error page (status: ${ordersResponse.status}). Check server logs.`;
+          } else {
+            const errorData = JSON.parse(errorText);
+            if (errorData.error) { 
+              errorDetails = `Failed to fetch pending orders: ${errorData.error}`;
+            } else if (errorData.message) {
+              errorDetails = errorData.message;
+            }
           }
         } catch (parseError) {
           console.error("Failed to parse JSON error response from fetching orders. Server might have sent HTML.", parseError);
@@ -74,18 +76,21 @@ export function SmartAssignmentForm() {
       }
       const ordersData: Order[] = await ordersResponse.json();
       setPendingOrders(ordersData);
-      setAllOrders(ordersData); // Keep a copy for finding selected order details
 
       if (!partnersResponse.ok) {
         let errorDetails = `Failed to fetch available partners (status: ${partnersResponse.status})`;
         try {
           const errorText = await partnersResponse.text();
           console.error("Raw error response from /api/partners?status=active:", errorText);
-          const errorData = JSON.parse(errorText); // Attempt to parse as JSON
-          if (errorData.error) { 
-            errorDetails = `Failed to fetch available partners: ${errorData.error}`;
-          } else if (errorData.message) {
-            errorDetails = errorData.message;
+           if (errorText.startsWith("<!DOCTYPE html>")) {
+            errorDetails = `Failed to fetch available partners. Server returned an HTML error page (status: ${partnersResponse.status}). Check server logs.`;
+          } else {
+            const errorData = JSON.parse(errorText);
+            if (errorData.error) { 
+              errorDetails = `Failed to fetch available partners: ${errorData.error}`;
+            } else if (errorData.message) {
+              errorDetails = errorData.message;
+            }
           }
         } catch (parseError) {
           console.error("Failed to parse JSON error response from fetching partners. Server might have sent HTML.", parseError);
@@ -98,8 +103,7 @@ export function SmartAssignmentForm() {
 
       const queryOrderId = searchParams.get('orderId');
       if (queryOrderId) {
-        const allFetchedOrders = [...ordersData, ...allOrders.filter(o => !ordersData.find(po => po.id === o.id))]; // Combine pending with potentially already fetched non-pending
-        const selectedOrder = allFetchedOrders.find(o => o.id === queryOrderId);
+        const selectedOrder = ordersData.find(o => o.id === queryOrderId);
         if (selectedOrder) {
           form.setValue('orderId', queryOrderId);
           form.setValue('orderLocation', selectedOrder.area);
@@ -116,7 +120,7 @@ export function SmartAssignmentForm() {
     } finally {
       setIsDataLoading(false);
     }
-  }, [toast, searchParams, form, allOrders]); // Added allOrders to dependency array
+  }, [toast, searchParams, form]); 
 
   useEffect(() => {
     fetchData();
@@ -127,7 +131,7 @@ export function SmartAssignmentForm() {
     setIsLoading(true);
     setAssignmentResult(null);
 
-    const selectedOrder = allOrders.find(o => o.id === data.orderId); 
+    const selectedOrder = pendingOrders.find(o => o.id === data.orderId); 
     if (!selectedOrder) {
         toast({ title: "Error", description: "Selected order not found.", variant: "destructive"});
         setIsLoading(false);
