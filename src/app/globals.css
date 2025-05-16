@@ -47,7 +47,6 @@ body {
   }
 
   .dark {
-    /* SwiftRoute is primarily light-themed, define dark mode if needed later, for now keep defaults or adjust slightly */
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
     --card: 0 0% 3.9%;

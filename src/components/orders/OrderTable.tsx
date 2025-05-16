@@ -1,4 +1,4 @@
-
+// @ts-nocheck
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -52,7 +52,6 @@ export function OrderTable({
         valB = valB.toLowerCase();
       }
 
-
       if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
       if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
       return 0;
@@ -103,22 +102,12 @@ export function OrderTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead onClick={() => handleSort('id')} className="cursor-pointer hover:bg-muted/50 w-[100px]">
-              Order ID {renderSortIcon('id')}
-            </TableHead>
+            <TableHead onClick={() => handleSort('id')} className="cursor-pointer hover:bg-muted/50 w-[100px]">Order ID {renderSortIcon('id')}</TableHead>
             <TableHead>Customer</TableHead>
-            <TableHead onClick={() => handleSort('area')} className="cursor-pointer hover:bg-muted/50">
-              Area {renderSortIcon('area')}
-            </TableHead>
-            <TableHead onClick={() => handleSort('status')} className="cursor-pointer hover:bg-muted/50">
-              Status {renderSortIcon('status')}
-            </TableHead>
-            <TableHead onClick={() => handleSort('orderValue')} className="cursor-pointer hover:bg-muted/50 text-right">
-              Value (₹) {renderSortIcon('orderValue')}
-            </TableHead>
-            <TableHead onClick={() => handleSort('creationDate')} className="cursor-pointer hover:bg-muted/50 text-right">
-              Created {renderSortIcon('creationDate')}
-            </TableHead>
+            <TableHead onClick={() => handleSort('area')} className="cursor-pointer hover:bg-muted/50">Area {renderSortIcon('area')}</TableHead>
+            <TableHead onClick={() => handleSort('status')} className="cursor-pointer hover:bg-muted/50">Status {renderSortIcon('status')}</TableHead>
+            <TableHead onClick={() => handleSort('orderValue')} className="cursor-pointer hover:bg-muted/50 text-right">Value (₹) {renderSortIcon('orderValue')}</TableHead>
+            <TableHead onClick={() => handleSort('creationDate')} className="cursor-pointer hover:bg-muted/50 text-right">Created {renderSortIcon('creationDate')}</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>

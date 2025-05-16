@@ -11,7 +11,7 @@ const fontSans = FontSans({
 });
 
 export const metadata: Metadata = {
-  title: 'SwiftRoute App', // Updated title
+  title: 'deliveryMaster App', // Updated title
   description: 'Efficient Delivery Management Platform', // Updated description
 };
 

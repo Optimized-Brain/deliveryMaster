@@ -29,8 +29,15 @@ export function FailedAssignmentsList({ className }: FailedAssignmentsListProps)
         let errorDetails = `Failed to fetch failed assignments (status: ${response.status})`;
         try {
             const errorData = await response.json();
-            const specificError = errorData.error || (errorData.details ? JSON.stringify(errorData.details) : null);
-            errorDetails = String(specificError || errorData.message || errorDetails);
+            // Prioritize specific error details from the API response
+            if (errorData.error) {
+              errorDetails = `Failed to fetch failed assignments: ${errorData.error}`;
+              if (errorData.details) {
+                errorDetails += ` (Details: ${errorData.details})`;
+              }
+            } else if (errorData.message) {
+              errorDetails = errorData.message;
+            }
         } catch (e) {
             const errorText = await response.text().catch(() => "Could not retrieve error text.");
             if (errorText.toLowerCase().includes("<!doctype html>")) {
@@ -94,8 +101,8 @@ export function FailedAssignmentsList({ className }: FailedAssignmentsListProps)
                         Customer: {item.customerName} ({item.area})
                       </p>
                     </div>
-                     <p className="text-xs text-muted-foreground whitespace-nowrap">
-                        {formatDistanceToNow(new Date(item.reportedAt), { addSuffix: true })}
+                     <p className="text-xs text-muted-foreground whitespace-nowrap" suppressHydrationWarning>
+                        {item.reportedAt ? formatDistanceToNow(new Date(item.reportedAt), { addSuffix: true }) : 'N/A'}
                       </p>
                   </div>
                   <div className="mt-2 p-2 bg-destructive/10 border border-destructive/30 rounded-md">
@@ -118,3 +125,4 @@ export function FailedAssignmentsList({ className }: FailedAssignmentsListProps)
     </Card>
   );
 }
+

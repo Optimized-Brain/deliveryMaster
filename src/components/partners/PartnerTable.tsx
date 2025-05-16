@@ -17,7 +17,6 @@ import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-
 interface AssignedOrdersPopoverContentProps {
   partnerName: string;
   partnerId: string;
@@ -33,8 +32,6 @@ function AssignedOrdersPopoverContent({
   deliveredOrders,
   cancelledOrders,
 }: AssignedOrdersPopoverContentProps) {
-  console.log(`[AssignedOrdersPopoverContent] Rendering for ${partnerName}. Active: ${activeOrders.length}, Delivered: ${deliveredOrders.length}, Cancelled: ${cancelledOrders.length}`);
-
   if (activeOrders.length === 0 && deliveredOrders.length === 0 && cancelledOrders.length === 0) {
     return <div className="p-4 text-muted-foreground text-sm">No orders found for {partnerName}.</div>;
   }
@@ -116,7 +113,7 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<PartnerStatus | 'all'>('all');
-  const { toast } = useToast(); 
+  const { toast } = useToast();
 
   const [partnerOrderData, setPartnerOrderData] = useState<Record<string, {
     active: Order[];
@@ -126,32 +123,26 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
     error: string | null;
   }>>({});
 
-
   const fetchOrdersForPartner = useCallback(async (partnerId: string, partnerName: string) => {
-    console.log(`[PartnerTable] fetchOrdersForPartner: Fetching orders for partner ID ${partnerId} (${partnerName})`);
     setPartnerOrderData(prev => ({
       ...prev,
       [partnerId]: { ...(prev[partnerId] || { active: [], delivered: [], cancelled: [], isLoading: true, error: null }), isLoading: true, error: null }
     }));
     try {
       const response = await fetch(`/api/orders?assignedPartnerId=${partnerId}`);
-      console.log(`[PartnerTable] fetchOrdersForPartner: API response status for ${partnerId}: ${response.status}`);
       if (!response.ok) {
         let message = `Failed to fetch orders for partner ${partnerName} (status: ${response.status})`;
         try {
-            const errorData = await response.json();
-            message = errorData.error || errorData.message || message;
+          const errorData = await response.json();
+          message = errorData.error || errorData.message || message;
         } catch (e) { /* ignore parsing error, use base message */ }
         throw new Error(message);
       }
       const orders: Order[] = await response.json();
-      console.log(`[PartnerTable] fetchOrdersForPartner: Received ${orders.length} raw orders for partner ${partnerId}:`, orders);
 
       const active = orders.filter(o => o.status === 'assigned' || o.status === 'picked');
       const delivered = orders.filter(o => o.status === 'delivered');
       const cancelled = orders.filter(o => o.status === 'cancelled');
-      
-      console.log(`[PartnerTable] fetchOrdersForPartner: Partner ${partnerId} - Categorized counts - Active: ${active.length}, Delivered: ${delivered.length}, Cancelled: ${cancelled.length}`);
 
       setPartnerOrderData(prev => ({
         ...prev,
@@ -159,25 +150,22 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
       }));
     } catch (e) {
       const errorMessage = (e as Error).message;
-      console.error(`[PartnerTable] fetchOrdersForPartner: Error fetching orders for partner ${partnerId}:`, errorMessage);
       setPartnerOrderData(prev => ({
         ...prev,
         [partnerId]: { ...(prev[partnerId] || { active: [], delivered: [], cancelled: [], isLoading: false, error: null }), isLoading: false, error: errorMessage }
       }));
-       toast({ 
+      toast({
         title: `Order Fetch Failed for ${partnerName}`,
         description: errorMessage,
         variant: "destructive"
       });
     }
-  }, [toast]); 
+  }, [toast]); // Added toast to dependency array
 
   useEffect(() => {
-    console.log("[PartnerTable] useEffect for partners changed. Processing partners:", partners.length);
     partners.forEach(partner => {
-      // Fetch if not present, or if it previously errored, or to refresh if already loaded
-      if (!partnerOrderData[partner.id] || partnerOrderData[partner.id]?.error || partnerOrderData[partner.id]?.isLoading === false) {
-        console.log(`[PartnerTable] useEffect: Triggering fetch for partner ${partner.id}`);
+      const currentData = partnerOrderData[partner.id];
+      if (!currentData || currentData.error || currentData.isLoading === false) { // Simplified condition to re-fetch if not loading and no error, or if there was an error.
         fetchOrdersForPartner(partner.id, partner.name);
       }
     });
@@ -205,8 +193,8 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
         let valB = b[sortKey as keyof Partner];
 
         if (['currentLoad', 'rating', 'completedOrders', 'cancelledOrders'].includes(sortKey)) {
-            valA = Number(valA);
-            valB = Number(valB);
+          valA = Number(valA);
+          valB = Number(valB);
         } else if (typeof valA === 'string' && typeof valB === 'string') {
           valA = valA.toLowerCase();
           valB = valB.toLowerCase();
@@ -239,7 +227,7 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
   };
 
   const getStatusBadgeClass = (status: PartnerStatus) => {
-     switch (status) {
+    switch (status) {
       case 'active': return 'bg-emerald-500 hover:bg-emerald-600 text-white';
       default: return '';
     }
@@ -273,7 +261,7 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
       </div>
 
       {filteredAndSortedPartners.length === 0 ? (
-         <p className="text-center text-muted-foreground py-8">No partners found matching your criteria.</p>
+        <p className="text-center text-muted-foreground py-8">No partners found matching your criteria.</p>
       ) : (
         <div className="rounded-md border shadow-sm bg-card">
           <Table>
@@ -283,7 +271,6 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                 <TableHead>Contact</TableHead>
                 <TableHead onClick={() => handleSort('status')} className="cursor-pointer hover:bg-muted/50">Status {renderSortIcon('status')}</TableHead>
                 <TableHead>Areas</TableHead>
-                <TableHead onClick={() => handleSort('currentLoad')} className="cursor-pointer hover:bg-muted/50 text-center whitespace-nowrap">Current Load {renderSortIcon('currentLoad')}</TableHead>
                 <TableHead className="text-center min-w-[200px]">Partner Orders Summary</TableHead>
                 <TableHead onClick={() => handleSort('rating')} className="cursor-pointer hover:bg-muted/50 text-center">Rating {renderSortIcon('rating')}</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -294,13 +281,12 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                 const ordersInfo = partnerOrderData[partner.id];
                 const isLoadingPartnerOrders = ordersInfo?.isLoading === true;
                 const partnerOrderError = ordersInfo?.error;
-                
-                // Use live fetched data for active count in summary
-                const activeCount = ordersInfo?.active?.length || 0;
-                // Use aggregate data from partner object for completed and cancelled for summary
-                const completedCount = partner.completedOrders;
-                const cancelledCount = partner.cancelledOrders;
 
+                const activeCount = ordersInfo?.active?.length || 0;
+                // Use aggregate from partner object for completed/cancelled in table cell for consistency with what's stored
+                // For the popover, we'll use the live fetched data.
+                const completedCount = ordersInfo?.delivered?.length || 0;
+                const cancelledCount = ordersInfo?.cancelled?.length || 0;
 
                 return (
                   <TableRow key={partner.id}>
@@ -321,43 +307,42 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                     <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate" title={partner.assignedAreas.join(', ')}>
                       {partner.assignedAreas.join(', ')}
                     </TableCell>
-                    <TableCell className="text-center">{partner.currentLoad}</TableCell>
                     <TableCell className="text-xs align-top pt-3">
-                        {isLoadingPartnerOrders && !ordersInfo ? ( 
-                             <div className="flex items-center justify-center">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                <span className="ml-1">Loading orders...</span>
-                             </div>
-                        ) : partnerOrderError && !ordersInfo?.active ? ( 
-                            <div className="text-destructive text-center" title={partnerOrderError}>Error!</div>
-                        ) : (
-                            <div className="space-y-0.5 text-center">
-                                <p>Active: <span className="font-semibold">{activeCount}</span></p>
-                                <p>Delivered: <span className="font-semibold">{completedCount}</span></p>
-                                <p>Cancelled: <span className="font-semibold">{cancelledCount}</span></p>
-                                <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant="link" size="sm" className="p-0 h-auto text-xs mt-1">
-                                        <Briefcase className="mr-1 h-3 w-3" /> View Details
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent
-                                    className="w-auto p-0"
-                                    onOpenAutoFocus={(e) => e.preventDefault()} 
-                                    align="center"
-                                    side="bottom"
-                                >
-                                    <AssignedOrdersPopoverContent
-                                        partnerId={partner.id}
-                                        partnerName={partner.name}
-                                        activeOrders={ordersInfo?.active || []}
-                                        deliveredOrders={ordersInfo?.delivered || []}
-                                        cancelledOrders={ordersInfo?.cancelled || []}
-                                    />
-                                </PopoverContent>
-                                </Popover>
-                            </div>
-                        )}
+                      {isLoadingPartnerOrders ? (
+                        <div className="flex items-center justify-center">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="ml-1">Loading...</span>
+                        </div>
+                      ) : partnerOrderError ? (
+                        <div className="text-destructive text-center" title={partnerOrderError}>Error!</div>
+                      ) : (
+                        <div className="space-y-0.5 text-center">
+                          <p>Active: <span className="font-semibold">{activeCount}</span></p>
+                          <p>Delivered: <span className="font-semibold">{completedCount}</span></p>
+                          <p>Cancelled: <span className="font-semibold">{cancelledCount}</span></p>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="link" size="sm" className="p-0 h-auto text-xs mt-1">
+                                <Briefcase className="mr-1 h-3 w-3" /> View Details
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="w-auto p-0"
+                              onOpenAutoFocus={(e) => e.preventDefault()}
+                              align="center"
+                              side="bottom"
+                            >
+                              <AssignedOrdersPopoverContent
+                                partnerId={partner.id}
+                                partnerName={partner.name}
+                                activeOrders={ordersInfo?.active || []}
+                                deliveredOrders={ordersInfo?.delivered || []}
+                                cancelledOrders={ordersInfo?.cancelled || []}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="text-center">{partner.rating.toFixed(1)}</TableCell>
                     <TableCell className="text-right">
@@ -377,7 +362,6 @@ export function PartnerTable({ partners, onEditPartner, onDeletePartner }: Partn
                           {onDeletePartner && (
                             <DropdownMenuItem
                               onClick={() => {
-                                console.log(`[PartnerTable] Delete DropdownMenuItem clicked for partner ID: ${partner.id}`);
                                 onDeletePartner(partner.id);
                               }}
                               className="text-destructive focus:text-destructive focus:bg-destructive/10"

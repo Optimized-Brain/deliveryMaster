@@ -2,7 +2,7 @@
 import type { NavItem, Partner, Order, Metric, PartnerStatus, OrderStatus } from '@/lib/types';
 import { LayoutDashboard, ListOrdered, Users, Shuffle, Package, BarChart3, Star, TrendingUp, TrendingDown, DollarSign, CheckCircle, AlertOctagon, Percent } from 'lucide-react';
 
-export const APP_NAME = "SwiftRoute";
+export const APP_NAME = "deliveryMaster";
 
 export const NAV_LINKS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
