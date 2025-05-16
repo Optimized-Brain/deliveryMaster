@@ -162,15 +162,5 @@ The application uses Next.js API Routes for backend logic:
     *   `types.ts`: TypeScript type definitions.
     *   `utils.ts`: Utility functions (e.g., `cn` for Tailwind class merging).
 *   `src/hooks/`: Custom React hooks (e.g., `use-toast`, `use-mobile`).
-*   `public/`: Static assets (e.g., `swiftroute-logo.png`).
 *   `.env`: Environment variables (Supabase keys, Google AI API Key).
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a pull request or open an issue for bugs, feature requests, or improvements.
-
-## License
-
-This project is licensed under the MIT License. See the `LICENSE` file for details (if one is created).
-(Consider adding an MIT License file if you intend this to be open source).
 
