@@ -1,6 +1,18 @@
 
 # deliveryMaster - Delivery Management Platform
 
+
+<div align="center">
+
+  <img src="https://img.shields.io/badge/Next-black?style=for-the-badge&logo=next.js&logoColor=white" />
+  <img src="https://img.shields.io/badge/tailwindcss-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white" />
+  <img src="https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" />
+  <img src="https://img.shields.io/badge/google%20gemini-8E75B2?style=for-the-badge&logo=google%20gemini&logoColor=white" />
+  <img src="https://img.shields.io/badge/shadcn/ui-111827?style=for-the-badge&logo=tailwind-css&logoColor=white" />
+
+</div>
+
+
 deliveryMaster is a modern, full-stack web application designed for efficient delivery management. It provides tools for managing orders and delivery partners. The platform is built with Next.js, React, ShadCN UI, Tailwind CSS, and uses Supabase for its backend database. It also features an AI-powered assistant to suggest optimal partner assignments.
 
 ## Overview
